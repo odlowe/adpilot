@@ -61,11 +61,17 @@ src/
 
 ## Database
 
-The app ships with a **zero-setup store** (`src/lib/db.ts`) shaped exactly
-like the production schema. Every change is persisted to `.data/store.json`,
-so accounts, businesses, and campaigns survive dev-server restarts. (On
-serverless hosts like Vercel the filesystem is ephemeral — data persists per
-warm instance only; move to Supabase for true production persistence.)
+The data layer (`src/lib/db.ts`) picks its backend automatically:
+
+- **Supabase (permanent)** — set `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY` as environment variables and run
+  `supabase/schema.sql` once in the Supabase SQL Editor. Accounts,
+  businesses, and campaigns are then stored permanently in Postgres.
+- **Local file store (zero setup)** — with no env vars, data persists to
+  `.data/store.json`. Great for development; ephemeral on serverless hosts.
+
+Both backends implement identical functions (`store-supabase.ts` /
+`store-file.ts`), so the rest of the app never knows which is active.
 
 Every new business is seeded with three flagged sample campaigns (one live,
 two completed) so the analytics and history views demonstrate themselves.
