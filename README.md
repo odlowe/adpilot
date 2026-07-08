@@ -3,9 +3,15 @@
 **Get Local Customers on Autopilot. No Tech Skills Required.**
 
 An automated AI marketing platform for non-technical small business owners.
-Instead of complex dashboards: two sliders, one plain-English text box, one
-Launch button. The agent writes the ads, maps the targeting, and runs the
-campaign on Google, Instagram (Meta), and Reddit simultaneously.
+Instead of complex dashboards: three dials (budget, radius, duration), one
+plain-English text box, one Launch button. The agent writes the ads, maps the
+targeting, and runs the campaign on Google, Instagram (Meta), and Reddit
+simultaneously — with a multi-business dashboard, plain-English analytics,
+30-day performance charts, and a campaign history archive.
+
+**Hero video:** drop an `hero-video.mp4` into `/public` to show a product
+video in the hero. Until then, the built-in animated "Ad Journey" scene
+renders automatically as the fallback.
 
 ## Quick start
 
@@ -55,9 +61,16 @@ src/
 
 ## Database
 
-The app ships with a **zero-setup in-memory store** (`src/lib/db.ts`) shaped
-exactly like the production schema, so it runs instantly. Data resets when the
-dev server restarts.
+The app ships with a **zero-setup store** (`src/lib/db.ts`) shaped exactly
+like the production schema. Every change is persisted to `.data/store.json`,
+so accounts, businesses, and campaigns survive dev-server restarts. (On
+serverless hosts like Vercel the filesystem is ephemeral — data persists per
+warm instance only; move to Supabase for true production persistence.)
+
+Every new business is seeded with three flagged sample campaigns (one live,
+two completed) so the analytics and history views demonstrate themselves.
+Metrics are generated deterministically per campaign (`src/lib/metrics.ts`) —
+stable numbers, not random on each reload.
 
 To go to production with **Supabase**:
 

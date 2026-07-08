@@ -4,12 +4,16 @@ import { createUser, findUserByEmail } from "@/lib/db";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as
-    | { email?: string; password?: string }
+    | { email?: string; password?: string; fullName?: string }
     | null;
 
   const email = body?.email?.trim().toLowerCase() ?? "";
   const password = body?.password ?? "";
+  const fullName = body?.fullName?.trim() ?? "";
 
+  if (fullName.length < 2) {
+    return NextResponse.json({ error: "Please tell us your name." }, { status: 400 });
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
@@ -26,7 +30,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await createUser({ email, passwordHash: hashPassword(password) });
+  const user = await createUser({ email, passwordHash: hashPassword(password), fullName });
   createSession(user.id);
   return NextResponse.json({ user: toSafeUser(user) }, { status: 201 });
 }

@@ -46,13 +46,13 @@ export default function Pricing() {
             <div className="mt-6">
               <Slider
                 label="Monthly ad budget"
-                min={100}
+                min={250}
                 max={5000}
                 step={50}
                 value={spend}
                 onChange={setSpend}
                 format={money}
-                leftHint="$100"
+                leftHint="$250"
                 rightHint="$5,000"
               />
             </div>

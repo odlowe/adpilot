@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     | null;
 
   const intentText = body?.intentText?.trim() ?? "";
-  const budget = clamp(Number(body?.budget) || 0, 100, 5000);
+  const budget = clamp(Number(body?.budget) || 0, 250, 5000);
   const radiusMiles = clamp(Number(body?.radiusMiles) || 0, 1, 50);
 
   if (intentText.length < 12) {

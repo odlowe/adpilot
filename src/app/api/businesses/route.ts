@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { createBusiness } from "@/lib/db";
+import { createBusiness, listBusinessesByUser } from "@/lib/db";
 import type { BusinessCategory } from "@/lib/types";
 
 const CATEGORIES: BusinessCategory[] = [
@@ -11,7 +11,14 @@ const CATEGORIES: BusinessCategory[] = [
   "Other",
 ];
 
-/** Completes the 2-step wizard: creates the user's first business. */
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Please log in first." }, { status: 401 });
+  }
+  return NextResponse.json({ businesses: await listBusinessesByUser(user.id) });
+}
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
@@ -19,10 +26,13 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { businessName?: string; category?: string }
+    | { name?: string; category?: string }
     | null;
 
-  const name = body?.businessName?.trim() || "My Business";
+  const name = body?.name?.trim() ?? "";
+  if (name.length < 2) {
+    return NextResponse.json({ error: "Please enter a business name." }, { status: 400 });
+  }
   const category: BusinessCategory = CATEGORIES.includes(body?.category as BusinessCategory)
     ? (body?.category as BusinessCategory)
     : "Other";

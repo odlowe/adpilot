@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Lock, Mail } from "lucide-react";
+import { Loader2, Lock, Mail, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -33,6 +33,7 @@ const COPY = {
 export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +48,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(mode === "signup" ? { fullName, email, password } : { email, password }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -70,6 +71,26 @@ export default function AuthForm({ mode }: AuthFormProps) {
       <p className="mt-1.5 text-slate-500">{copy.subtitle}</p>
 
       <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+        {mode === "signup" && (
+          <div>
+            <label htmlFor="fullName" className="text-sm font-semibold text-navy-900">
+              Full name
+            </label>
+            <div className="relative mt-1.5">
+              <UserRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id="fullName"
+                type="text"
+                required
+                autoComplete="name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="e.g., Dana Rivera"
+                className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-3.5 text-[15px] outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              />
+            </div>
+          </div>
+        )}
         <div>
           <label htmlFor="email" className="text-sm font-semibold text-navy-900">
             Email
