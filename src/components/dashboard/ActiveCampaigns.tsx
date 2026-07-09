@@ -1,6 +1,19 @@
 "use client";
 
-import { BarChart3, MapPin, Plus, Radio, Rocket, SlidersHorizontal } from "lucide-react";
+import {
+  BarChart3,
+  Loader2,
+  MapPin,
+  Pause,
+  Play,
+  Plus,
+  Radio,
+  Rocket,
+  SlidersHorizontal,
+  Square,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { budgetProgress } from "@/lib/metrics";
 import type { Campaign, Platform, PlatformStatus } from "@/lib/types";
 
@@ -36,7 +49,26 @@ export default function ActiveCampaigns({
   onCreate: () => void;
   onViewAnalytics: (campaign: Campaign) => void;
 }) {
-  const active = campaigns.filter((c) => c.status === "active");
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const active = campaigns.filter((c) => c.status === "active" || c.status === "paused");
+
+  async function control(campaign: Campaign, action: "pause" | "resume" | "end") {
+    if (action === "end" && !window.confirm(`End "${campaign.name}" for good? It moves to Past Ad Buys and can't be restarted.`)) {
+      return;
+    }
+    setBusyId(campaign.id);
+    try {
+      await fetch(`/api/campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -68,6 +100,11 @@ export default function ActiveCampaigns({
                       {campaign.isSample && (
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">
                           Sample
+                        </span>
+                      )}
+                      {campaign.status === "paused" && (
+                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">
+                          Paused
                         </span>
                       )}
                     </p>
@@ -120,14 +157,46 @@ export default function ActiveCampaigns({
                   </div>
                 </div>
 
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {campaign.status === "paused" ? (
+                      <button
+                        type="button"
+                        disabled={busyId === campaign.id}
+                        onClick={() => control(campaign, "resume")}
+                        className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-card transition hover:bg-emerald-500 disabled:opacity-60"
+                      >
+                        {busyId === campaign.id ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                        Resume
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busyId === campaign.id}
+                        onClick={() => control(campaign, "pause")}
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-amber-400 hover:text-amber-700 disabled:opacity-60"
+                      >
+                        {busyId === campaign.id ? <Loader2 size={14} className="animate-spin" /> : <Pause size={14} />}
+                        Pause
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={busyId === campaign.id}
+                      onClick={() => control(campaign, "end")}
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-700 disabled:opacity-60"
+                    >
+                      <Square size={13} />
+                      End campaign
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => onViewAnalytics(campaign)}
                     className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700"
                   >
                     <BarChart3 size={14} />
-                    View analytics for this campaign
+                    View analytics
                   </button>
                 </div>
               </div>

@@ -110,9 +110,19 @@ export default function AuthForm({ mode }: AuthFormProps) {
           </div>
         </div>
         <div>
-          <label htmlFor="password" className="text-sm font-semibold text-navy-900">
-            Password
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-semibold text-navy-900">
+              Password
+            </label>
+            {mode === "login" && (
+              <Link
+                href="/forgot-password"
+                className="text-xs font-semibold text-emerald-700 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            )}
+          </div>
           <div className="relative mt-1.5">
             <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input

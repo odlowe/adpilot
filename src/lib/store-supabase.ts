@@ -4,8 +4,10 @@
  * server-side with the service-role key; row-level security stays enabled
  * so the database is closed to everyone else.
  */
+import { randomUUID } from "crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { buildSampleCampaigns } from "./samples";
+import { DEFAULT_EMAIL_PREFS } from "./types";
 import type {
   AdCopy,
   BillingInfo,
@@ -13,6 +15,7 @@ import type {
   BusinessCategory,
   Campaign,
   CampaignStatus,
+  EmailPrefs,
   Platform,
   PlatformSplit,
   PlatformStatus,
@@ -40,6 +43,7 @@ interface UserRow {
   full_name: string;
   birthdate: string | null;
   billing_json: BillingInfo | null;
+  email_prefs: EmailPrefs | null;
   created_at: string;
 }
 
@@ -64,6 +68,7 @@ interface CampaignRow {
   platform_split: PlatformSplit;
   site_categories: string[];
   custom_sites: string[];
+  creative_url: string | null;
   industry_text: string;
   targeting_json: Targeting;
   ad_copy_json: AdCopy;
@@ -82,6 +87,7 @@ const toUser = (r: UserRow): User => ({
   fullName: r.full_name,
   birthdate: r.birthdate,
   billingJson: r.billing_json,
+  emailPrefs: r.email_prefs ?? { ...DEFAULT_EMAIL_PREFS },
   createdAt: r.created_at,
 });
 
@@ -106,6 +112,7 @@ const toCampaign = (r: CampaignRow): Campaign => ({
   platformSplit: r.platform_split,
   siteCategories: r.site_categories ?? [],
   customSites: r.custom_sites ?? [],
+  creativeUrl: r.creative_url,
   industryText: r.industry_text,
   targetingJson: r.targeting_json,
   adCopyJson: r.ad_copy_json,
@@ -129,6 +136,7 @@ const campaignToRow = (c: Omit<Campaign, "id" | "createdAt"> & { createdAt?: str
   platform_split: c.platformSplit,
   site_categories: c.siteCategories,
   custom_sites: c.customSites,
+  creative_url: c.creativeUrl,
   industry_text: c.industryText,
   targeting_json: c.targetingJson,
   ad_copy_json: c.adCopyJson,
@@ -180,13 +188,15 @@ export async function getUserById(id: string): Promise<User | null> {
 
 export async function updateUser(
   id: string,
-  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson">>
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash">>
 ): Promise<User | null> {
   const rowPatch: Record<string, unknown> = {};
   if (patch.fullName !== undefined) rowPatch.full_name = patch.fullName;
   if (patch.email !== undefined) rowPatch.email = patch.email.toLowerCase().trim();
   if (patch.birthdate !== undefined) rowPatch.birthdate = patch.birthdate;
   if (patch.billingJson !== undefined) rowPatch.billing_json = patch.billingJson;
+  if (patch.emailPrefs !== undefined) rowPatch.email_prefs = patch.emailPrefs;
+  if (patch.passwordHash !== undefined) rowPatch.password_hash = patch.passwordHash;
 
   const { data: row, error } = await db()
     .from("users")
@@ -262,4 +272,64 @@ export async function listCampaignsByUser(userId: string): Promise<Campaign[]> {
     .order("created_at", { ascending: false });
   if (error) fail("listCampaignsByUser", error.message);
   return ((rows ?? []) as CampaignRow[]).map(toCampaign);
+}
+
+export async function updateCampaignStatus(
+  id: string,
+  userId: string,
+  status: CampaignStatus
+): Promise<Campaign | null> {
+  const platformStatuses =
+    status === "active"
+      ? { google: "live", meta: "live", reddit: "live" }
+      : { google: "paused", meta: "paused", reddit: "paused" };
+  const rowPatch: Record<string, unknown> = { status, platform_statuses: platformStatuses };
+  if (status === "completed") rowPatch.end_date = new Date().toISOString();
+
+  const { data: row, error } = await db()
+    .from("campaigns")
+    .update(rowPatch)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error) fail("updateCampaignStatus", error.message);
+  return row ? toCampaign(row as CampaignRow) : null;
+}
+
+// ---- password reset ----------------------------------------------------------
+
+export async function createPasswordResetToken(email: string): Promise<string | null> {
+  const user = await findUserByEmail(email);
+  if (!user) return null;
+  const token = randomUUID().replace(/-/g, "");
+  const { error } = await db().from("password_resets").insert({
+    token,
+    user_id: user.id,
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  });
+  if (error) fail("createPasswordResetToken", error.message);
+  return token;
+}
+
+export async function consumePasswordResetToken(token: string): Promise<string | null> {
+  const { data: row, error } = await db()
+    .from("password_resets")
+    .select("*")
+    .eq("token", token)
+    .maybeSingle();
+  if (error) fail("consumePasswordResetToken", error.message);
+  if (!row) return null;
+  await db().from("password_resets").delete().eq("token", token);
+  const entry = row as { user_id: string; expires_at: string };
+  if (new Date(entry.expires_at).getTime() < Date.now()) return null;
+  return entry.user_id;
+}
+
+// ---- account deletion ----------------------------------------------------------
+
+export async function deleteUser(id: string): Promise<void> {
+  // businesses, campaigns, and reset tokens cascade via foreign keys
+  const { error } = await db().from("users").delete().eq("id", id);
+  if (error) fail("deleteUser", error.message);
 }

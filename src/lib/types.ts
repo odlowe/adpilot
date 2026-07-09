@@ -2,7 +2,21 @@ export type Platform = "google" | "meta" | "reddit";
 
 export type PlatformStatus = "draft" | "in_review" | "live" | "paused";
 
-export type CampaignStatus = "active" | "completed";
+export type CampaignStatus = "active" | "paused" | "completed";
+
+export type DigestFrequency = "daily" | "weekly" | "monthly";
+
+export interface EmailPrefs {
+  /** Master switch — false silences all non-essential email. */
+  enabled: boolean;
+  /** How often the automated all-campaigns performance digest goes out. */
+  digestFrequency: DigestFrequency;
+}
+
+export const DEFAULT_EMAIL_PREFS: EmailPrefs = {
+  enabled: true,
+  digestFrequency: "weekly",
+};
 
 export type BusinessCategory =
   | "Home Services"
@@ -46,6 +60,7 @@ export interface User {
   fullName: string;
   birthdate: string | null; // yyyy-mm-dd
   billingJson: BillingInfo | null;
+  emailPrefs: EmailPrefs;
   createdAt: string;
 }
 
@@ -76,6 +91,7 @@ export interface Campaign {
   platformSplit: PlatformSplit;
   siteCategories: string[];
   customSites: string[];
+  creativeUrl: string | null;
   industryText: string;
   targetingJson: Targeting;
   adCopyJson: AdCopy;

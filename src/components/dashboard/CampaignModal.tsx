@@ -69,6 +69,8 @@ export default function CampaignModal({
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [creativeUrl, setCreativeUrl] = useState<string | null>(null);
+
   // Manual Mode
   const [manualMode, setManualMode] = useState(false);
   const [split, setSplit] = useState<PlatformSplit>({ google: 34, meta: 33, reddit: 33 });
@@ -146,6 +148,7 @@ export default function CampaignModal({
           platformSplit: split,
           siteCategories,
           customSites,
+          creativeUrl,
           industryText: intentText,
           plan,
         }),
@@ -271,7 +274,7 @@ export default function CampaignModal({
                     Ad photo or video <span className="font-normal text-slate-400">(optional)</span>
                   </p>
                   <div className="mt-2">
-                    <CreativeUploader />
+                    <CreativeUploader onUploaded={setCreativeUrl} />
                   </div>
                 </div>
 

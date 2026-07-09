@@ -15,7 +15,15 @@ create table if not exists public.users (
   full_name     text not null default '',
   birthdate     text,
   billing_json  jsonb,
+  email_prefs   jsonb not null default '{"enabled":true,"digestFrequency":"weekly"}'::jsonb,
   created_at    timestamptz not null default now()
+);
+
+-- Password reset tokens (short-lived, single use)
+create table if not exists public.password_resets (
+  token      text primary key,
+  user_id    uuid not null references public.users (id) on delete cascade,
+  expires_at timestamptz not null
 );
 
 -- Businesses: one account can own several
@@ -41,11 +49,12 @@ create table if not exists public.campaigns (
   platform_split    jsonb not null default '{"google":34,"meta":33,"reddit":33}'::jsonb,
   site_categories   jsonb not null default '[]'::jsonb,
   custom_sites      jsonb not null default '[]'::jsonb,
+  creative_url      text,
   industry_text     text not null,
   targeting_json    jsonb not null default '{}'::jsonb,
   ad_copy_json      jsonb not null default '{}'::jsonb,
   platform_statuses jsonb not null default '{"google":"draft","meta":"draft","reddit":"draft"}'::jsonb,
-  status            text not null default 'active' check (status in ('active','completed')),
+  status            text not null default 'active' check (status in ('active','paused','completed')),
   start_date        timestamptz not null default now(),
   end_date          timestamptz,
   is_sample         boolean not null default false,
@@ -61,3 +70,4 @@ create index if not exists campaigns_business_id_idx on public.campaigns (busine
 alter table public.users enable row level security;
 alter table public.businesses enable row level security;
 alter table public.campaigns enable row level security;
+alter table public.password_resets enable row level security;

@@ -42,6 +42,7 @@ export async function POST(request: Request) {
         platformSplit?: Partial<PlatformSplit>;
         siteCategories?: string[];
         customSites?: string[];
+        creativeUrl?: string | null;
         industryText?: string;
         plan?: CampaignPlan;
       }
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
       : { google: 34, meta: 33, reddit: 33 },
     siteCategories: (body.siteCategories ?? []).map((s) => String(s).slice(0, 60)).slice(0, 20),
     customSites: (body.customSites ?? []).map((s) => String(s).slice(0, 120)).slice(0, 25),
+    creativeUrl: typeof body.creativeUrl === "string" ? body.creativeUrl : null,
     industryText: summary,
     targetingJson: body.plan.targeting,
     adCopyJson: body.plan.adCopy,

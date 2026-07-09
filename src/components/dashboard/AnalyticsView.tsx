@@ -84,7 +84,11 @@ export default function AnalyticsView({ campaigns }: { campaigns: Campaign[] }) 
                     {campaign.name}
                   </span>
                   <span className="text-xs text-slate-400">
-                    {campaign.status === "active" ? "Live now" : "Completed"}
+                    {campaign.status === "active"
+                      ? "Live now"
+                      : campaign.status === "paused"
+                        ? "Paused"
+                        : "Completed"}
                     {campaign.isSample ? " · Sample" : ""}
                   </span>
                 </span>

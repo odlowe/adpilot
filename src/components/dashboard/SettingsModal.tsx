@@ -1,17 +1,31 @@
 "use client";
 
-import { CheckCircle2, CreditCard, FileText, Loader2, ShieldCheck, UserRound, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CreditCard,
+  Loader2,
+  Mail,
+  UserRound,
+  X,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { SafeUser } from "@/lib/types";
+import type { DigestFrequency, SafeUser } from "@/lib/types";
 
-type Tab = "account" | "billing" | "terms" | "privacy";
+type Tab = "account" | "billing" | "email";
 
 const TABS: Array<{ key: Tab; label: string; icon: typeof UserRound }> = [
   { key: "account", label: "Account", icon: UserRound },
   { key: "billing", label: "Billing", icon: CreditCard },
-  { key: "terms", label: "Terms of Service", icon: FileText },
-  { key: "privacy", label: "Privacy Policy", icon: ShieldCheck },
+  { key: "email", label: "Email updates", icon: Mail },
+];
+
+const FREQUENCIES: Array<{ value: DigestFrequency; label: string; blurb: string }> = [
+  { value: "daily", label: "Daily", blurb: "A quick note every morning with yesterday's numbers." },
+  { value: "weekly", label: "Weekly", blurb: "Every Monday: how all your campaigns did last week. (Most popular)" },
+  { value: "monthly", label: "Monthly", blurb: "One tidy report at the start of each month." },
 ];
 
 export default function SettingsModal({ user, onClose }: { user: SafeUser; onClose: () => void }) {
@@ -29,6 +43,16 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
   const [expMonth, setExpMonth] = useState(user.billingJson?.expMonth ?? 1);
   const [expYear, setExpYear] = useState(user.billingJson?.expYear ?? 2027);
   const [billingZip, setBillingZip] = useState(user.billingJson?.billingZip ?? "");
+
+  // email prefs
+  const [emailsEnabled, setEmailsEnabled] = useState(user.emailPrefs?.enabled ?? true);
+  const [frequency, setFrequency] = useState<DigestFrequency>(
+    user.emailPrefs?.digestFrequency ?? "weekly"
+  );
+
+  // delete account
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -53,6 +77,22 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
       setMessage({ ok: false, text: "Couldn't reach the server." });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account", { method: "DELETE" });
+      if (res.ok) {
+        window.location.href = "/";
+      } else {
+        setMessage({ ok: false, text: "Deletion failed — please try again." });
+        setDeleting(false);
+      }
+    } catch {
+      setMessage({ ok: false, text: "Couldn't reach the server." });
+      setDeleting(false);
     }
   }
 
@@ -99,24 +139,56 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
 
         <div className="max-h-[65vh] overflow-y-auto p-6 sm:p-7">
           {tab === "account" && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void save({ fullName, email, birthdate: birthdate || null });
-              }}
-            >
-              <label className={labelClass} htmlFor="set-name">Full name</label>
-              <input id="set-name" type="text" required minLength={2} value={fullName} onChange={(e) => setFullName(e.target.value)} className={`${inputClass} mt-1.5`} />
+            <>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save({ fullName, email, birthdate: birthdate || null });
+                }}
+              >
+                <label className={labelClass} htmlFor="set-name">Full name</label>
+                <input id="set-name" type="text" required minLength={2} value={fullName} onChange={(e) => setFullName(e.target.value)} className={`${inputClass} mt-1.5`} />
 
-              <label className={labelClass} htmlFor="set-email">Email</label>
-              <input id="set-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputClass} mt-1.5`} />
-              <p className="mt-1 text-xs text-slate-400">This is also your login email.</p>
+                <label className={labelClass} htmlFor="set-email">Email</label>
+                <input id="set-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputClass} mt-1.5`} />
+                <p className="mt-1 text-xs text-slate-400">This is also your login email.</p>
 
-              <label className={labelClass} htmlFor="set-birthdate">Birthdate</label>
-              <input id="set-birthdate" type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className={`${inputClass} mt-1.5`} />
+                <label className={labelClass} htmlFor="set-birthdate">Birthdate</label>
+                <input id="set-birthdate" type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} className={`${inputClass} mt-1.5`} />
 
-              <SaveRow saving={saving} message={message} />
-            </form>
+                <SaveRow saving={saving} message={message} />
+              </form>
+
+              {/* danger zone */}
+              <div className="mt-8 rounded-xl border border-rose-200 bg-rose-50/50 p-5">
+                <p className="flex items-center gap-2 text-sm font-bold text-rose-800">
+                  <AlertTriangle size={15} />
+                  Delete account
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-rose-700">
+                  Permanently removes your account, all businesses, and all campaigns. There is
+                  no undo. Type <span className="font-bold">DELETE</span> to confirm.
+                </p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="text"
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    placeholder="Type DELETE"
+                    className="w-full rounded-xl border border-rose-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-rose-500 focus:ring-4 focus:ring-rose-100 sm:max-w-[200px]"
+                  />
+                  <button
+                    type="button"
+                    disabled={deleteConfirm !== "DELETE" || deleting}
+                    onClick={handleDelete}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {deleting && <Loader2 size={15} className="animate-spin" />}
+                    Delete my account forever
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
           {tab === "billing" && (
@@ -179,34 +251,75 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
             </form>
           )}
 
-          {tab === "terms" && (
-            <LegalText
-              title="Terms of Service"
-              paragraphs={[
-                "Welcome to AdPilot. By creating an account you agree to these terms, which exist to keep things fair for you and for us.",
-                "The service: AdPilot creates and manages digital advertising campaigns on your behalf across third-party platforms. You choose the budget; we place the ads. Ad spend goes to the advertising platforms; our management fee is 15% of your chosen ad budget, billed monthly alongside it.",
-                "Your responsibilities: you confirm the business information and ad content you provide is accurate, that you have rights to any images or video you upload, and that your ads comply with applicable laws for your industry and location.",
-                "Billing and cancellation: plans renew monthly. You can pause or cancel anytime from your dashboard, effective at the end of the current billing cycle. No long-term contracts, no cancellation fees.",
-                "Performance: advertising results vary and we do not guarantee specific outcomes such as clicks, customers, or revenue. Estimates shown in the dashboard are projections, not promises.",
-                "Liability: to the maximum extent permitted by law, our liability is limited to the management fees you paid in the three months preceding a claim.",
-                "We may update these terms; if we do, we will notify you by email before changes take effect.",
-              ]}
-            />
-          )}
+          {tab === "email" && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void save({ emailPrefs: { enabled: emailsEnabled, digestFrequency: frequency } });
+              }}
+            >
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+                <div>
+                  <p className="text-sm font-semibold text-navy-900">Campaign update emails</p>
+                  <p className="text-xs text-slate-500">
+                    Automated plain-English reports on how all your campaigns are doing.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={emailsEnabled}
+                  onClick={() => setEmailsEnabled((v) => !v)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${emailsEnabled ? "bg-emerald-600" : "bg-slate-300"}`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${emailsEnabled ? "left-[22px]" : "left-0.5"}`}
+                  />
+                </button>
+              </div>
 
-          {tab === "privacy" && (
-            <LegalText
-              title="Privacy Policy"
-              paragraphs={[
-                "We collect only what we need to run your campaigns: your name, email, business details, campaign settings, and payment information (of which we store only the last four digits of your card).",
-                "How we use it: to create and manage your ad campaigns, bill you correctly, and send you service updates. We share campaign data with the advertising platforms (Google, Meta, Reddit) only as required to run your ads.",
-                "What we never do: sell your personal information, share your customer descriptions with other businesses, or use your data to compete with you.",
-                "Your rights: you can view and edit your information in Settings at any time, export your campaign data on request, and delete your account entirely by contacting support — deletion removes your personal data from our systems within 30 days.",
-                "Security: passwords are stored hashed (never in plain text), connections are encrypted, and access to production data is restricted.",
-                "Questions? Email us and a human will answer.",
-              ]}
-            />
+              <div className={`mt-4 space-y-2 transition ${emailsEnabled ? "" : "pointer-events-none opacity-40"}`}>
+                <p className="text-sm font-semibold text-navy-900">How often?</p>
+                {FREQUENCIES.map(({ value, label, blurb }) => (
+                  <label
+                    key={value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition ${
+                      frequency === value
+                        ? "border-emerald-400 bg-emerald-50/60"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="digest-frequency"
+                      value={value}
+                      checked={frequency === value}
+                      onChange={() => setFrequency(value)}
+                      className="mt-1 h-4 w-4 accent-emerald-600"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-navy-900">{label}</span>
+                      <span className="text-xs text-slate-500">{blurb}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              {!emailsEnabled && (
+                <p className="mt-3 text-xs text-slate-400">
+                  All non-essential email is off. You&apos;ll still get password resets and billing
+                  receipts — those are required to run your account.
+                </p>
+              )}
+
+              <SaveRow saving={saving} message={message} />
+            </form>
           )}
+        </div>
+
+        <div className="border-t border-slate-100 px-6 py-3 text-center text-xs text-slate-400">
+          Looking for the legal stuff? <Link href="/terms" className="underline hover:text-navy-700">Terms of Service</Link>{" "}
+          and <Link href="/privacy" className="underline hover:text-navy-700">Privacy Policy</Link> now live in the site footer.
         </div>
       </div>
     </div>
@@ -240,24 +353,6 @@ function SaveRow({
           {message.text}
         </span>
       )}
-    </div>
-  );
-}
-
-function LegalText({ title, paragraphs }: { title: string; paragraphs: string[] }) {
-  return (
-    <div>
-      <h3 className="text-base font-bold text-navy-900">{title}</h3>
-      <p className="mt-1 text-xs text-slate-400">
-        Template for early access — have a lawyer review before charging customers.
-      </p>
-      <div className="mt-4 space-y-3.5">
-        {paragraphs.map((p) => (
-          <p key={p.slice(0, 24)} className="text-sm leading-relaxed text-slate-600">
-            {p}
-          </p>
-        ))}
-      </div>
     </div>
   );
 }

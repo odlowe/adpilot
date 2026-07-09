@@ -1,18 +1,25 @@
 "use client";
 
-import { FileVideo, ImagePlus, X } from "lucide-react";
+import { FileVideo, ImagePlus, Loader2, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 /**
  * Drag-and-drop zone for the campaign's photo or video.
- * Files are previewed locally; wire the upload to storage
- * (e.g. Supabase Storage) when going to production.
+ * Pass `onUploaded` to store the file for real (via /api/upload — Supabase
+ * Storage when configured); without it, the file is preview-only.
  */
-export default function CreativeUploader() {
+export default function CreativeUploader({
+  onUploaded,
+}: {
+  onUploaded?: (url: string | null) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [stored, setStored] = useState(false);
 
   const acceptFile = useCallback(
     (candidate: File | undefined) => {
@@ -21,14 +28,41 @@ export default function CreativeUploader() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setFile(candidate);
       setPreviewUrl(URL.createObjectURL(candidate));
+      setUploadError(null);
+      setStored(false);
+
+      if (onUploaded) {
+        setUploading(true);
+        const form = new FormData();
+        form.append("file", candidate);
+        fetch("/api/upload", { method: "POST", body: form })
+          .then(async (res) => {
+            const data = (await res.json()) as { url?: string; error?: string };
+            if (res.ok && data.url) {
+              onUploaded(data.url);
+              setStored(true);
+            } else {
+              setUploadError(data.error ?? "Upload failed — the campaign can still launch without it.");
+              onUploaded(null);
+            }
+          })
+          .catch(() => {
+            setUploadError("Upload failed — the campaign can still launch without it.");
+            onUploaded(null);
+          })
+          .finally(() => setUploading(false));
+      }
     },
-    [previewUrl]
+    [previewUrl, onUploaded]
   );
 
   function clearFile() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
+    setUploadError(null);
+    setStored(false);
+    onUploaded?.(null);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -51,10 +85,17 @@ export default function CreativeUploader() {
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-navy-900">{file.name}</p>
           <p className="text-xs text-slate-500">
-            {isVideo ? "Video" : "Photo"} &middot; {(file.size / 1024 / 1024).toFixed(1)} MB —
-            looks great, we&apos;ll fit it to every platform.
+            {isVideo ? "Video" : "Photo"} &middot; {(file.size / 1024 / 1024).toFixed(1)} MB
+            {uploading
+              ? " — uploading…"
+              : stored
+                ? " — saved! We'll fit it to every platform."
+                : uploadError
+                  ? ` — ${uploadError}`
+                  : " — looks great, we'll fit it to every platform."}
           </p>
         </div>
+        {uploading && <Loader2 size={16} className="shrink-0 animate-spin text-emerald-600" />}
         <button
           type="button"
           onClick={clearFile}

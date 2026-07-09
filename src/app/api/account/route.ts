@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, toSafeUser } from "@/lib/auth";
-import { findUserByEmail, updateUser } from "@/lib/db";
-import type { BillingInfo } from "@/lib/types";
+import { clearSession, getCurrentUser, toSafeUser } from "@/lib/auth";
+import { deleteUser, findUserByEmail, updateUser } from "@/lib/db";
+import type { BillingInfo, DigestFrequency, EmailPrefs } from "@/lib/types";
+
+const FREQUENCIES: DigestFrequency[] = ["daily", "weekly", "monthly"];
 
 /**
  * Updates account info and (demo) billing details.
@@ -26,6 +28,7 @@ export async function PATCH(request: Request) {
           expYear?: number;
           billingZip?: string;
         } | null;
+        emailPrefs?: { enabled?: boolean; digestFrequency?: string };
       }
     | null;
 
@@ -38,7 +41,17 @@ export async function PATCH(request: Request) {
     email?: string;
     birthdate?: string | null;
     billingJson?: BillingInfo | null;
+    emailPrefs?: EmailPrefs;
   } = {};
+
+  if (body.emailPrefs) {
+    patch.emailPrefs = {
+      enabled: body.emailPrefs.enabled !== false,
+      digestFrequency: FREQUENCIES.includes(body.emailPrefs.digestFrequency as DigestFrequency)
+        ? (body.emailPrefs.digestFrequency as DigestFrequency)
+        : "weekly",
+    };
+  }
 
   if (typeof body.fullName === "string") {
     if (body.fullName.trim().length < 2) {
@@ -92,4 +105,15 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Account not found." }, { status: 404 });
   }
   return NextResponse.json({ user: toSafeUser(updated) });
+}
+
+/** Permanently deletes the account and everything it owns. */
+export async function DELETE() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Please log in first." }, { status: 401 });
+  }
+  await deleteUser(user.id);
+  clearSession();
+  return NextResponse.json({ ok: true });
 }

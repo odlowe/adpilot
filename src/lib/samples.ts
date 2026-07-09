@@ -73,6 +73,7 @@ export async function buildSampleCampaigns(
       platformSplit: { google: 34, meta: 33, reddit: 33 },
       siteCategories: [],
       customSites: [],
+      creativeUrl: null,
       industryText: intent,
       targetingJson: plan.targeting,
       adCopyJson: plan.adCopy,

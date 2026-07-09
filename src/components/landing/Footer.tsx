@@ -6,7 +6,7 @@ export default function Footer() {
     <footer className="border-t border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-5 px-4 py-10 sm:flex-row sm:px-6">
         <Logo />
-        <nav className="flex items-center gap-6 text-sm font-medium text-slate-500">
+        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-slate-500">
           <a href="/#how-it-works" className="transition hover:text-navy-900">
             How it works
           </a>
@@ -15,6 +15,12 @@ export default function Footer() {
           </a>
           <Link href="/login" className="transition hover:text-navy-900">
             Log in
+          </Link>
+          <Link href="/terms" className="transition hover:text-navy-900">
+            Terms of Service
+          </Link>
+          <Link href="/privacy" className="transition hover:text-navy-900">
+            Privacy Policy
           </Link>
         </nav>
         <p className="text-sm text-slate-400">

@@ -6,12 +6,20 @@ import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { buildSampleCampaigns } from "./samples";
-import type { Business, Campaign, User } from "./types";
+import { DEFAULT_EMAIL_PREFS } from "./types";
+import type { Business, Campaign, CampaignStatus, User } from "./types";
+
+interface ResetToken {
+  token: string;
+  userId: string;
+  expiresAt: string;
+}
 
 interface Store {
   users: Map<string, User>;
   businesses: Map<string, Business>;
   campaigns: Map<string, Campaign>;
+  resetTokens: Map<string, ResetToken>;
 }
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -31,12 +39,18 @@ function loadStore(): Store {
         users: new Map((raw.users ?? []).map((u) => [u.id, u])),
         businesses: new Map((raw.businesses ?? []).map((b) => [b.id, b])),
         campaigns: new Map((raw.campaigns ?? []).map((c) => [c.id, c])),
+        resetTokens: new Map(),
       };
     }
   } catch {
     // Corrupt or unreadable file — start fresh rather than crash.
   }
-  return { users: new Map(), businesses: new Map(), campaigns: new Map() };
+  return {
+    users: new Map(),
+    businesses: new Map(),
+    campaigns: new Map(),
+    resetTokens: new Map(),
+  };
 }
 
 const store: Store = globalForDb.__adpilotStore ?? (globalForDb.__adpilotStore = loadStore());
@@ -71,6 +85,7 @@ export async function createUser(
     fullName: data.fullName.trim(),
     birthdate: null,
     billingJson: null,
+    emailPrefs: { ...DEFAULT_EMAIL_PREFS },
     createdAt: new Date().toISOString(),
   };
   store.users.set(user.id, user);
@@ -80,7 +95,7 @@ export async function createUser(
 
 export async function updateUser(
   id: string,
-  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson">>
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash">>
 ): Promise<User | null> {
   const user = store.users.get(id);
   if (!user) return null;
@@ -152,4 +167,63 @@ export async function listCampaignsByUser(userId: string): Promise<Campaign[]> {
   return [...store.campaigns.values()]
     .filter((c) => c.userId === userId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function updateCampaignStatus(
+  id: string,
+  userId: string,
+  status: CampaignStatus
+): Promise<Campaign | null> {
+  const campaign = store.campaigns.get(id);
+  if (!campaign || campaign.userId !== userId) return null;
+  const updated: Campaign = {
+    ...campaign,
+    status,
+    endDate: status === "completed" ? new Date().toISOString() : campaign.endDate,
+    platformStatuses:
+      status === "active"
+        ? { google: "live", meta: "live", reddit: "live" }
+        : { google: "paused", meta: "paused", reddit: "paused" },
+  };
+  store.campaigns.set(id, updated);
+  persist();
+  return updated;
+}
+
+// ---- password reset ---------------------------------------------------------
+
+export async function createPasswordResetToken(email: string): Promise<string | null> {
+  const user = await findUserByEmail(email);
+  if (!user) return null;
+  const token = randomUUID().replace(/-/g, "");
+  store.resetTokens.set(token, {
+    token,
+    userId: user.id,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
+  });
+  return token;
+}
+
+export async function consumePasswordResetToken(token: string): Promise<string | null> {
+  const entry = store.resetTokens.get(token);
+  if (!entry) return null;
+  store.resetTokens.delete(token);
+  if (new Date(entry.expiresAt).getTime() < Date.now()) return null;
+  return entry.userId;
+}
+
+// ---- account deletion ---------------------------------------------------------
+
+export async function deleteUser(id: string): Promise<void> {
+  store.users.delete(id);
+  for (const [bizId, biz] of store.businesses) {
+    if (biz.userId === id) store.businesses.delete(bizId);
+  }
+  for (const [campaignId, campaign] of store.campaigns) {
+    if (campaign.userId === id) store.campaigns.delete(campaignId);
+  }
+  for (const [token, entry] of store.resetTokens) {
+    if (entry.userId === id) store.resetTokens.delete(token);
+  }
+  persist();
 }
