@@ -16,6 +16,8 @@ create table if not exists public.users (
   birthdate     text,
   billing_json  jsonb,
   email_prefs   jsonb not null default '{"enabled":true,"digestFrequency":"weekly"}'::jsonb,
+  failed_logins integer not null default 0,
+  locked_until  timestamptz,
   created_at    timestamptz not null default now()
 );
 
@@ -28,11 +30,15 @@ create table if not exists public.password_resets (
 
 -- Businesses: one account can own several
 create table if not exists public.businesses (
-  id         uuid primary key default gen_random_uuid(),
-  user_id    uuid not null references public.users (id) on delete cascade,
-  name       text not null,
-  category   text not null default 'Other',
-  created_at timestamptz not null default now()
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.users (id) on delete cascade,
+  name        text not null,
+  category    text not null default 'Other',
+  description text not null default '',
+  address     text not null default '',
+  phone       text not null default '',
+  website     text not null default '',
+  created_at  timestamptz not null default now()
 );
 
 -- Campaigns

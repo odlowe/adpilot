@@ -61,6 +61,10 @@ export interface User {
   birthdate: string | null; // yyyy-mm-dd
   billingJson: BillingInfo | null;
   emailPrefs: EmailPrefs;
+  /** Consecutive wrong-password attempts (resets on success). */
+  failedLogins: number;
+  /** Login blocked until this time after 3 straight failures. */
+  lockedUntil: string | null;
   createdAt: string;
 }
 
@@ -71,6 +75,11 @@ export interface Business {
   userId: string;
   name: string;
   category: BusinessCategory;
+  /** Free-text profile the AI uses for better copy & targeting. */
+  description: string;
+  address: string;
+  phone: string;
+  website: string;
   createdAt: string;
 }
 

@@ -86,11 +86,42 @@ export async function createUser(
     birthdate: null,
     billingJson: null,
     emailPrefs: { ...DEFAULT_EMAIL_PREFS },
+    failedLogins: 0,
+    lockedUntil: null,
     createdAt: new Date().toISOString(),
   };
   store.users.set(user.id, user);
   persist();
   return user;
+}
+
+export async function listUsers(): Promise<User[]> {
+  return [...store.users.values()];
+}
+
+/** Records a wrong password; 3 in a row locks the account for 10 minutes. */
+export async function recordLoginFailure(
+  id: string
+): Promise<{ locked: boolean; lockedUntil: string | null }> {
+  const user = store.users.get(id);
+  if (!user) return { locked: false, lockedUntil: null };
+  const failures = (user.failedLogins ?? 0) + 1;
+  if (failures >= 3) {
+    const lockedUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    store.users.set(id, { ...user, failedLogins: 0, lockedUntil });
+    persist();
+    return { locked: true, lockedUntil };
+  }
+  store.users.set(id, { ...user, failedLogins: failures });
+  persist();
+  return { locked: false, lockedUntil: null };
+}
+
+export async function clearLoginFailures(id: string): Promise<void> {
+  const user = store.users.get(id);
+  if (!user) return;
+  store.users.set(id, { ...user, failedLogins: 0, lockedUntil: null });
+  persist();
 }
 
 export async function updateUser(
@@ -129,6 +160,10 @@ export async function createBusiness(
     userId: data.userId,
     name: data.name.trim() || "My Business",
     category: data.category,
+    description: "",
+    address: "",
+    phone: "",
+    website: "",
     createdAt: new Date().toISOString(),
   };
   store.businesses.set(business.id, business);
@@ -138,6 +173,30 @@ export async function createBusiness(
   }
   persist();
   return business;
+}
+
+export async function updateBusiness(
+  id: string,
+  userId: string,
+  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website">>
+): Promise<Business | null> {
+  const business = store.businesses.get(id);
+  if (!business || business.userId !== userId) return null;
+  const updated = { ...business, ...patch };
+  store.businesses.set(id, updated);
+  persist();
+  return updated;
+}
+
+export async function deleteBusiness(id: string, userId: string): Promise<boolean> {
+  const business = store.businesses.get(id);
+  if (!business || business.userId !== userId) return false;
+  store.businesses.delete(id);
+  for (const [campaignId, campaign] of store.campaigns) {
+    if (campaign.businessId === id) store.campaigns.delete(campaignId);
+  }
+  persist();
+  return true;
 }
 
 export async function listBusinessesByUser(userId: string): Promise<Business[]> {
@@ -167,6 +226,19 @@ export async function listCampaignsByUser(userId: string): Promise<Campaign[]> {
   return [...store.campaigns.values()]
     .filter((c) => c.userId === userId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function updateCampaign(
+  id: string,
+  userId: string,
+  patch: Partial<Pick<Campaign, "name" | "budget" | "zip" | "durationMonths" | "continuous">>
+): Promise<Campaign | null> {
+  const campaign = store.campaigns.get(id);
+  if (!campaign || campaign.userId !== userId) return null;
+  const updated = { ...campaign, ...patch };
+  store.campaigns.set(id, updated);
+  persist();
+  return updated;
 }
 
 export async function updateCampaignStatus(

@@ -114,7 +114,7 @@ export default function CampaignModal({
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intentText, budget, radiusMiles: radius }),
+        body: JSON.stringify({ intentText, budget, radiusMiles: radius, businessId }),
       });
       const data = (await res.json()) as { plan?: CampaignPlan; error?: string };
       if (!res.ok || !data.plan) {

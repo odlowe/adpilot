@@ -22,6 +22,9 @@ export default function Footer() {
           <Link href="/privacy" className="transition hover:text-navy-900">
             Privacy Policy
           </Link>
+          <a href="mailto:support@adpilot.example" className="transition hover:text-navy-900">
+            Support
+          </a>
         </nav>
         <p className="text-sm text-slate-400">
           &copy; {new Date().getFullYear()} AdPilot. Made for main street.

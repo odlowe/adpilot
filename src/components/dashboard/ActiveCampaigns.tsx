@@ -5,6 +5,7 @@ import {
   Loader2,
   MapPin,
   Pause,
+  Pencil,
   Play,
   Plus,
   Radio,
@@ -44,10 +45,12 @@ export default function ActiveCampaigns({
   campaigns,
   onCreate,
   onViewAnalytics,
+  onEdit,
 }: {
   campaigns: Campaign[];
   onCreate: () => void;
   onViewAnalytics: (campaign: Campaign) => void;
+  onEdit: (campaign: Campaign) => void;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -94,9 +97,37 @@ export default function ActiveCampaigns({
             return (
               <div key={campaign.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    {campaign.creativeUrl &&
+                      (campaign.creativeUrl.startsWith("data:video") ||
+                      /\.(mp4|webm|mov)($|\?)/i.test(campaign.creativeUrl) ? (
+                        <video
+                          src={campaign.creativeUrl}
+                          muted
+                          loop
+                          autoPlay
+                          playsInline
+                          className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 object-cover"
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={campaign.creativeUrl}
+                          alt=""
+                          className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 object-cover"
+                        />
+                      ))}
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2 font-bold leading-snug text-navy-900">
                       {campaign.name}
+                      <button
+                        type="button"
+                        onClick={() => onEdit(campaign)}
+                        aria-label={`Edit ${campaign.name}`}
+                        className="rounded-md p-1 text-slate-300 transition hover:bg-slate-100 hover:text-navy-900"
+                      >
+                        <Pencil size={13} />
+                      </button>
                       {campaign.isSample && (
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">
                           Sample
@@ -125,6 +156,7 @@ export default function ActiveCampaigns({
                         </span>
                       )}
                     </p>
+                  </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     {PLATFORMS.map(({ key, label }) => (

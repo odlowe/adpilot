@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateCampaignPlan } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
+import { getBusinessById } from "@/lib/db";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -9,10 +10,19 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { intentText?: string; budget?: number; radiusMiles?: number }
+    | { intentText?: string; budget?: number; radiusMiles?: number; businessId?: string }
     | null;
 
-  const intentText = body?.intentText?.trim() ?? "";
+  let intentText = body?.intentText?.trim() ?? "";
+
+  // Enrich with the business profile so the agent has more to go on.
+  if (body?.businessId) {
+    const business = await getBusinessById(body.businessId);
+    if (business && business.userId === user.id) {
+      const profileBits = [business.description, business.address].filter(Boolean).join(". ");
+      if (profileBits) intentText = `${intentText}. About the business: ${profileBits}`;
+    }
+  }
   const budget = clamp(Number(body?.budget) || 0, 250, 5000);
   const radiusMiles = clamp(Number(body?.radiusMiles) || 0, 1, 50);
 

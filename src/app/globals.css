@@ -3,6 +3,24 @@
 @tailwind utilities;
 
 /* ---------------------------------- */
+/* Dark mode                           */
+/* Applied by toggling .dark on <html> */
+/* (saved in localStorage, loaded      */
+/* before paint by a script in layout) */
+/* ---------------------------------- */
+
+html.dark {
+  background: #071527;
+  filter: invert(1) hue-rotate(180deg);
+}
+/* keep photos, video, and brand gradients true-to-color */
+html.dark img,
+html.dark video,
+html.dark .no-invert {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* ---------------------------------- */
 /* Range sliders                       */
 /* ---------------------------------- */
 

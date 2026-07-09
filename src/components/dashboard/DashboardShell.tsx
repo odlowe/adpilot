@@ -5,9 +5,9 @@ import {
   Building2,
   ChevronDown,
   History,
-  Loader2,
   LogOut,
   Megaphone,
+  Pencil,
   Plus,
   Settings,
   X,
@@ -17,7 +17,9 @@ import { useEffect, useMemo, useState } from "react";
 import ActiveCampaigns from "./ActiveCampaigns";
 import AnalyticsPanel from "./AnalyticsPanel";
 import AnalyticsView from "./AnalyticsView";
+import BusinessModal from "./BusinessModal";
 import CampaignModal from "./CampaignModal";
+import EditCampaignModal from "./EditCampaignModal";
 import HistoryTable from "./HistoryTable";
 import SettingsModal from "./SettingsModal";
 import Logo from "@/components/Logo";
@@ -31,14 +33,6 @@ const TABS: Array<{ key: Tab; label: string; icon: typeof Megaphone }> = [
   { key: "campaigns", label: "Active Campaigns", icon: Megaphone },
   { key: "analytics", label: "Analytics", icon: BarChart3 },
   { key: "history", label: "Past Ad Buys", icon: History },
-];
-
-const CATEGORIES = [
-  "Home Services",
-  "Retail/Boutique",
-  "Fitness/Gym",
-  "Professional Services",
-  "Other",
 ];
 
 export default function DashboardShell({
@@ -57,12 +51,10 @@ export default function DashboardShell({
   const [draft, setDraft] = useState<CampaignDraft | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analyticsCampaign, setAnalyticsCampaign] = useState<Campaign | null>(null);
+  const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
 
-  // add-business modal state
-  const [bizModalOpen, setBizModalOpen] = useState(false);
-  const [bizName, setBizName] = useState("");
-  const [bizCategory, setBizCategory] = useState(CATEGORIES[1]);
-  const [bizSaving, setBizSaving] = useState(false);
+  // business modal: "create" or the business being edited
+  const [bizModal, setBizModal] = useState<"create" | Business | null>(null);
 
   // Pick up the campaign the visitor configured on the landing page.
   useEffect(() => {
@@ -86,27 +78,6 @@ export default function DashboardShell({
     () => campaigns.filter((c) => c.businessId === selectedBusiness?.id),
     [campaigns, selectedBusiness?.id]
   );
-
-  async function handleAddBusiness(e: React.FormEvent) {
-    e.preventDefault();
-    setBizSaving(true);
-    try {
-      const res = await fetch("/api/businesses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: bizName, category: bizCategory }),
-      });
-      const data = (await res.json()) as { business?: Business };
-      if (res.ok && data.business) {
-        setSelectedId(data.business.id);
-        setBizModalOpen(false);
-        setBizName("");
-        router.refresh();
-      }
-    } finally {
-      setBizSaving(false);
-    }
-  }
 
   const firstName = user.fullName.split(" ")[0] || user.fullName;
 
@@ -140,9 +111,19 @@ export default function DashboardShell({
               className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
             />
           </div>
+          {selectedBusiness && (
+            <button
+              type="button"
+              onClick={() => setBizModal(selectedBusiness)}
+              aria-label={`Edit ${selectedBusiness.name}`}
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-900"
+            >
+              <Pencil size={14} />
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setBizModalOpen(true)}
+            onClick={() => setBizModal("create")}
             className="hidden items-center gap-1 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-semibold text-slate-500 transition hover:border-emerald-400 hover:text-emerald-700 sm:flex"
           >
             <Plus size={14} />
@@ -195,7 +176,7 @@ export default function DashboardShell({
         {/* mobile add-business */}
         <button
           type="button"
-          onClick={() => setBizModalOpen(true)}
+          onClick={() => setBizModal("create")}
           className="mt-4 flex items-center gap-1 text-sm font-semibold text-emerald-700 sm:hidden"
         >
           <Plus size={14} />
@@ -225,6 +206,7 @@ export default function DashboardShell({
               campaigns={businessCampaigns}
               onCreate={() => setCampaignModalOpen(true)}
               onViewAnalytics={setAnalyticsCampaign}
+              onEdit={setEditCampaign}
             />
           )}
           {tab === "analytics" && (
@@ -276,64 +258,29 @@ export default function DashboardShell({
         </div>
       )}
 
-      {bizModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/60 p-4 backdrop-blur-sm">
-          <form
-            onSubmit={handleAddBusiness}
-            className="w-full max-w-md rounded-2xl bg-white p-7 shadow-lift"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-navy-900">Add a new business</h2>
-              <button
-                type="button"
-                onClick={() => setBizModalOpen(false)}
-                aria-label="Close"
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-900"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p className="mt-1 text-sm text-slate-500">
-              Run campaigns for another shop, location, or venture — all under one login.
-            </p>
-            <label className="mt-5 block text-sm font-semibold text-navy-900" htmlFor="biz-name">
-              Business name
-            </label>
-            <input
-              id="biz-name"
-              type="text"
-              required
-              minLength={2}
-              value={bizName}
-              onChange={(e) => setBizName(e.target.value)}
-              placeholder="e.g., Main St. Bakery — Downtown"
-              className="mt-1.5 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-[15px] outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-            />
-            <label className="mt-4 block text-sm font-semibold text-navy-900" htmlFor="biz-category">
-              Category
-            </label>
-            <select
-              id="biz-category"
-              value={bizCategory}
-              onChange={(e) => setBizCategory(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-[15px] outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              disabled={bizSaving}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-emerald-500 disabled:opacity-60"
-            >
-              {bizSaving && <Loader2 size={16} className="animate-spin" />}
-              Add business
-            </button>
-          </form>
-        </div>
+      {editCampaign && (
+        <EditCampaignModal campaign={editCampaign} onClose={() => setEditCampaign(null)} />
+      )}
+
+      {bizModal && (
+        <BusinessModal
+          business={bizModal === "create" ? undefined : bizModal}
+          canDelete={businesses.length > 1}
+          onClose={() => setBizModal(null)}
+          onSaved={(businessId) => {
+            setBizModal(null);
+            if (businessId) {
+              setSelectedId(businessId);
+            } else {
+              // business deleted — fall back to the first remaining one
+              const remaining = businesses.filter(
+                (b) => bizModal !== "create" && b.id !== bizModal.id
+              );
+              if (remaining[0]) setSelectedId(remaining[0].id);
+            }
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

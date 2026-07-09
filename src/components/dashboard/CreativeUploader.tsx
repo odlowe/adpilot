@@ -69,41 +69,52 @@ export default function CreativeUploader({
   if (file && previewUrl) {
     const isVideo = file.type.startsWith("video/");
     return (
-      <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+        {/* live preview */}
         {isVideo ? (
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-navy-900 text-emerald-400">
-            <FileVideo size={26} />
-          </span>
+          <video
+            src={previewUrl}
+            controls
+            muted
+            loop
+            playsInline
+            className="max-h-64 w-full bg-navy-950 object-contain"
+          />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={previewUrl}
-            alt="Your ad creative"
-            className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 object-cover"
+            alt="Preview of your ad creative"
+            className="max-h-64 w-full bg-white object-contain"
           />
         )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-navy-900">{file.name}</p>
-          <p className="text-xs text-slate-500">
-            {isVideo ? "Video" : "Photo"} &middot; {(file.size / 1024 / 1024).toFixed(1)} MB
-            {uploading
-              ? " — uploading…"
-              : stored
-                ? " — saved! We'll fit it to every platform."
-                : uploadError
-                  ? ` — ${uploadError}`
-                  : " — looks great, we'll fit it to every platform."}
-          </p>
+        <div className="flex items-center gap-3 p-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-900 text-emerald-400">
+            {isVideo ? <FileVideo size={17} /> : <ImagePlus size={17} />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-navy-900">{file.name}</p>
+            <p className="text-xs text-slate-500">
+              {isVideo ? "Video" : "Photo"} &middot; {(file.size / 1024 / 1024).toFixed(1)} MB
+              {uploading
+                ? " — uploading…"
+                : stored
+                  ? " — saved! We'll fit it to every platform."
+                  : uploadError
+                    ? ` — ${uploadError}`
+                    : " — looks great, we'll fit it to every platform."}
+            </p>
+          </div>
+          {uploading && <Loader2 size={16} className="shrink-0 animate-spin text-emerald-600" />}
+          <button
+            type="button"
+            onClick={clearFile}
+            aria-label="Remove file"
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-200 hover:text-navy-900"
+          >
+            <X size={16} />
+          </button>
         </div>
-        {uploading && <Loader2 size={16} className="shrink-0 animate-spin text-emerald-600" />}
-        <button
-          type="button"
-          onClick={clearFile}
-          aria-label="Remove file"
-          className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-200 hover:text-navy-900"
-        >
-          <X size={16} />
-        </button>
       </div>
     );
   }

@@ -44,6 +44,8 @@ interface UserRow {
   birthdate: string | null;
   billing_json: BillingInfo | null;
   email_prefs: EmailPrefs | null;
+  failed_logins: number | null;
+  locked_until: string | null;
   created_at: string;
 }
 
@@ -52,6 +54,10 @@ interface BusinessRow {
   user_id: string;
   name: string;
   category: string;
+  description: string | null;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
   created_at: string;
 }
 
@@ -88,6 +94,8 @@ const toUser = (r: UserRow): User => ({
   birthdate: r.birthdate,
   billingJson: r.billing_json,
   emailPrefs: r.email_prefs ?? { ...DEFAULT_EMAIL_PREFS },
+  failedLogins: r.failed_logins ?? 0,
+  lockedUntil: r.locked_until,
   createdAt: r.created_at,
 });
 
@@ -96,6 +104,10 @@ const toBusiness = (r: BusinessRow): Business => ({
   userId: r.user_id,
   name: r.name,
   category: r.category as BusinessCategory,
+  description: r.description ?? "",
+  address: r.address ?? "",
+  phone: r.phone ?? "",
+  website: r.website ?? "",
   createdAt: r.created_at,
 });
 
@@ -186,6 +198,32 @@ export async function getUserById(id: string): Promise<User | null> {
   return row ? toUser(row as UserRow) : null;
 }
 
+export async function listUsers(): Promise<User[]> {
+  const { data: rows, error } = await db().from("users").select("*");
+  if (error) fail("listUsers", error.message);
+  return ((rows ?? []) as UserRow[]).map(toUser);
+}
+
+/** Records a wrong password; 3 in a row locks the account for 10 minutes. */
+export async function recordLoginFailure(
+  id: string
+): Promise<{ locked: boolean; lockedUntil: string | null }> {
+  const user = await getUserById(id);
+  if (!user) return { locked: false, lockedUntil: null };
+  const failures = (user.failedLogins ?? 0) + 1;
+  if (failures >= 3) {
+    const lockedUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await db().from("users").update({ failed_logins: 0, locked_until: lockedUntil }).eq("id", id);
+    return { locked: true, lockedUntil };
+  }
+  await db().from("users").update({ failed_logins: failures }).eq("id", id);
+  return { locked: false, lockedUntil: null };
+}
+
+export async function clearLoginFailures(id: string): Promise<void> {
+  await db().from("users").update({ failed_logins: 0, locked_until: null }).eq("id", id);
+}
+
 export async function updateUser(
   id: string,
   patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash">>
@@ -234,6 +272,33 @@ export async function createBusiness(
   return business;
 }
 
+export async function updateBusiness(
+  id: string,
+  userId: string,
+  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website">>
+): Promise<Business | null> {
+  const { data: row, error } = await db()
+    .from("businesses")
+    .update(patch)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error) fail("updateBusiness", error.message);
+  return row ? toBusiness(row as BusinessRow) : null;
+}
+
+export async function deleteBusiness(id: string, userId: string): Promise<boolean> {
+  const { data: rows, error } = await db()
+    .from("businesses")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id");
+  if (error) fail("deleteBusiness", error.message);
+  return (rows ?? []).length > 0;
+}
+
 export async function listBusinessesByUser(userId: string): Promise<Business[]> {
   const { data: rows, error } = await db()
     .from("businesses")
@@ -272,6 +337,29 @@ export async function listCampaignsByUser(userId: string): Promise<Campaign[]> {
     .order("created_at", { ascending: false });
   if (error) fail("listCampaignsByUser", error.message);
   return ((rows ?? []) as CampaignRow[]).map(toCampaign);
+}
+
+export async function updateCampaign(
+  id: string,
+  userId: string,
+  patch: Partial<Pick<Campaign, "name" | "budget" | "zip" | "durationMonths" | "continuous">>
+): Promise<Campaign | null> {
+  const rowPatch: Record<string, unknown> = {};
+  if (patch.name !== undefined) rowPatch.name = patch.name;
+  if (patch.budget !== undefined) rowPatch.budget = patch.budget;
+  if (patch.zip !== undefined) rowPatch.zip = patch.zip;
+  if (patch.durationMonths !== undefined) rowPatch.duration_months = patch.durationMonths;
+  if (patch.continuous !== undefined) rowPatch.continuous = patch.continuous;
+
+  const { data: row, error } = await db()
+    .from("campaigns")
+    .update(rowPatch)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error) fail("updateCampaign", error.message);
+  return row ? toCampaign(row as CampaignRow) : null;
 }
 
 export async function updateCampaignStatus(

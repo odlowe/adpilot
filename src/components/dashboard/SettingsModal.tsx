@@ -4,22 +4,26 @@ import {
   AlertTriangle,
   CheckCircle2,
   CreditCard,
+  KeyRound,
   Loader2,
   Mail,
+  Moon,
+  Sun,
   UserRound,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DigestFrequency, SafeUser } from "@/lib/types";
 
-type Tab = "account" | "billing" | "email";
+type Tab = "account" | "billing" | "email" | "appearance";
 
 const TABS: Array<{ key: Tab; label: string; icon: typeof UserRound }> = [
   { key: "account", label: "Account", icon: UserRound },
   { key: "billing", label: "Billing", icon: CreditCard },
   { key: "email", label: "Email updates", icon: Mail },
+  { key: "appearance", label: "Appearance", icon: Moon },
 ];
 
 const FREQUENCIES: Array<{ value: DigestFrequency; label: string; blurb: string }> = [
@@ -53,6 +57,46 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
   // delete account
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  // password reset via email
+  const [resetSending, setResetSending] = useState(false);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
+  const [resetDevUrl, setResetDevUrl] = useState<string | null>(null);
+
+  // dark mode
+  const [darkMode, setDarkMode] = useState(false);
+  useEffect(() => {
+    setDarkMode(document.documentElement.classList.contains("dark"));
+  }, []);
+  function toggleDarkMode(next: boolean) {
+    setDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      localStorage.setItem("adpilot_theme", next ? "dark" : "light");
+    } catch {
+      // private browsing — theme just won't persist
+    }
+  }
+
+  async function sendResetEmail() {
+    setResetSending(true);
+    setResetNotice(null);
+    setResetDevUrl(null);
+    try {
+      const res = await fetch("/api/auth/forgot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = (await res.json()) as { message?: string; devResetUrl?: string };
+      setResetNotice(data.message ?? "Check your inbox for the reset link.");
+      setResetDevUrl(data.devResetUrl ?? null);
+    } catch {
+      setResetNotice("Couldn't reach the server. Please try again.");
+    } finally {
+      setResetSending(false);
+    }
+  }
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -158,6 +202,40 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
 
                 <SaveRow saving={saving} message={message} />
               </form>
+
+              {/* password reset */}
+              <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
+                  <KeyRound size={15} className="text-emerald-600" />
+                  Change password
+                </p>
+                <p className="mt-1.5 text-sm text-slate-600">
+                  For security, password changes go through your email — we&apos;ll send a
+                  confirmation link to <span className="font-semibold">{user.email}</span>.
+                </p>
+                <button
+                  type="button"
+                  disabled={resetSending}
+                  onClick={sendResetEmail}
+                  className="mt-3 flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700 disabled:opacity-60"
+                >
+                  {resetSending && <Loader2 size={14} className="animate-spin" />}
+                  Email me a password reset link
+                </button>
+                {resetNotice && (
+                  <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900">
+                    {resetNotice}
+                  </p>
+                )}
+                {resetDevUrl && (
+                  <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
+                    Email sending isn&apos;t connected yet, so here&apos;s the link directly:{" "}
+                    <Link href={resetDevUrl} className="font-semibold underline">
+                      Reset my password
+                    </Link>
+                  </p>
+                )}
+              </div>
 
               {/* danger zone */}
               <div className="mt-8 rounded-xl border border-rose-200 bg-rose-50/50 p-5">
@@ -314,6 +392,39 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
 
               <SaveRow saving={saving} message={message} />
             </form>
+          )}
+
+          {tab === "appearance" && (
+            <div>
+              <p className="text-sm font-semibold text-navy-900">Theme</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Saved on this device — switches instantly, no reload needed.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleDarkMode(false)}
+                  className={`flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 transition ${
+                    !darkMode ? "border-emerald-500 bg-emerald-50/60" : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <Sun size={22} className={!darkMode ? "text-emerald-600" : "text-slate-400"} />
+                  <span className="text-sm font-semibold text-navy-900">Light</span>
+                  <span className="text-xs text-slate-400">Crisp and classic</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleDarkMode(true)}
+                  className={`flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 transition ${
+                    darkMode ? "border-emerald-500 bg-emerald-50/60" : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <Moon size={22} className={darkMode ? "text-emerald-600" : "text-slate-400"} />
+                  <span className="text-sm font-semibold text-navy-900">Dark</span>
+                  <span className="text-xs text-slate-400">Easy on the eyes</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
