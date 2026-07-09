@@ -8,11 +8,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { buildSampleCampaigns } from "./samples";
 import type {
   AdCopy,
+  BillingInfo,
   Business,
   BusinessCategory,
   Campaign,
   CampaignStatus,
   Platform,
+  PlatformSplit,
   PlatformStatus,
   Targeting,
   User,
@@ -36,6 +38,8 @@ interface UserRow {
   email: string;
   password_hash: string;
   full_name: string;
+  birthdate: string | null;
+  billing_json: BillingInfo | null;
   created_at: string;
 }
 
@@ -56,6 +60,10 @@ interface CampaignRow {
   zip: string;
   duration_months: number;
   continuous: boolean;
+  manual_mode: boolean;
+  platform_split: PlatformSplit;
+  site_categories: string[];
+  custom_sites: string[];
   industry_text: string;
   targeting_json: Targeting;
   ad_copy_json: AdCopy;
@@ -72,6 +80,8 @@ const toUser = (r: UserRow): User => ({
   email: r.email,
   passwordHash: r.password_hash,
   fullName: r.full_name,
+  birthdate: r.birthdate,
+  billingJson: r.billing_json,
   createdAt: r.created_at,
 });
 
@@ -92,6 +102,10 @@ const toCampaign = (r: CampaignRow): Campaign => ({
   zip: r.zip,
   durationMonths: r.duration_months,
   continuous: r.continuous,
+  manualMode: r.manual_mode,
+  platformSplit: r.platform_split,
+  siteCategories: r.site_categories ?? [],
+  customSites: r.custom_sites ?? [],
   industryText: r.industry_text,
   targetingJson: r.targeting_json,
   adCopyJson: r.ad_copy_json,
@@ -111,6 +125,10 @@ const campaignToRow = (c: Omit<Campaign, "id" | "createdAt"> & { createdAt?: str
   zip: c.zip,
   duration_months: c.durationMonths,
   continuous: c.continuous,
+  manual_mode: c.manualMode,
+  platform_split: c.platformSplit,
+  site_categories: c.siteCategories,
+  custom_sites: c.customSites,
   industry_text: c.industryText,
   targeting_json: c.targetingJson,
   ad_copy_json: c.adCopyJson,
@@ -157,6 +175,26 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 export async function getUserById(id: string): Promise<User | null> {
   const { data: row, error } = await db().from("users").select("*").eq("id", id).maybeSingle();
   if (error) fail("getUserById", error.message);
+  return row ? toUser(row as UserRow) : null;
+}
+
+export async function updateUser(
+  id: string,
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson">>
+): Promise<User | null> {
+  const rowPatch: Record<string, unknown> = {};
+  if (patch.fullName !== undefined) rowPatch.full_name = patch.fullName;
+  if (patch.email !== undefined) rowPatch.email = patch.email.toLowerCase().trim();
+  if (patch.birthdate !== undefined) rowPatch.birthdate = patch.birthdate;
+  if (patch.billingJson !== undefined) rowPatch.billing_json = patch.billingJson;
+
+  const { data: row, error } = await db()
+    .from("users")
+    .update(rowPatch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) fail("updateUser", error.message);
   return row ? toUser(row as UserRow) : null;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Plus, Radio, Rocket } from "lucide-react";
+import { BarChart3, MapPin, Plus, Radio, Rocket, SlidersHorizontal } from "lucide-react";
 import { budgetProgress } from "@/lib/metrics";
 import type { Campaign, Platform, PlatformStatus } from "@/lib/types";
 
@@ -30,9 +30,11 @@ const STATUS_TEXT: Record<PlatformStatus, string> = {
 export default function ActiveCampaigns({
   campaigns,
   onCreate,
+  onViewAnalytics,
 }: {
   campaigns: Campaign[];
   onCreate: () => void;
+  onViewAnalytics: (campaign: Campaign) => void;
 }) {
   const active = campaigns.filter((c) => c.status === "active");
 
@@ -79,6 +81,12 @@ export default function ActiveCampaigns({
                         <Radio size={13} />
                         {campaign.continuous ? "Continuous" : `${campaign.durationMonths} month run`}
                       </span>
+                      {campaign.manualMode && (
+                        <span className="flex items-center gap-1 font-semibold text-navy-700">
+                          <SlidersHorizontal size={13} />
+                          Manual mode
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -110,6 +118,17 @@ export default function ActiveCampaigns({
                       style={{ width: `${Math.max(4, Math.round(progress * 100))}%` }}
                     />
                   </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onViewAnalytics(campaign)}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700"
+                  >
+                    <BarChart3 size={14} />
+                    View analytics for this campaign
+                  </button>
                 </div>
               </div>
             );

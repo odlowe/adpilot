@@ -1,7 +1,21 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createCampaign, getBusinessById, listCampaignsByUser } from "@/lib/db";
-import type { CampaignPlan } from "@/lib/types";
+import type { CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
+
+/** Normalize any three numbers into whole percentages summing to 100. */
+function normalizeSplit(input?: Partial<PlatformSplit>): PlatformSplit {
+  const raw: Record<Platform, number> = {
+    google: Math.max(0, Number(input?.google) || 0),
+    meta: Math.max(0, Number(input?.meta) || 0),
+    reddit: Math.max(0, Number(input?.reddit) || 0),
+  };
+  const total = raw.google + raw.meta + raw.reddit;
+  if (total <= 0) return { google: 34, meta: 33, reddit: 33 };
+  const google = Math.round((raw.google / total) * 100);
+  const meta = Math.round((raw.meta / total) * 100);
+  return { google, meta, reddit: 100 - google - meta };
+}
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -24,6 +38,10 @@ export async function POST(request: Request) {
         zip?: string;
         durationMonths?: number;
         continuous?: boolean;
+        manualMode?: boolean;
+        platformSplit?: Partial<PlatformSplit>;
+        siteCategories?: string[];
+        customSites?: string[];
         industryText?: string;
         plan?: CampaignPlan;
       }
@@ -50,6 +68,12 @@ export async function POST(request: Request) {
     zip: body.zip?.trim().slice(0, 32) ?? "",
     durationMonths: Math.min(6, Math.max(1, Math.round(body.durationMonths ?? 1))),
     continuous: Boolean(body.continuous),
+    manualMode: Boolean(body.manualMode),
+    platformSplit: body.manualMode
+      ? normalizeSplit(body.platformSplit)
+      : { google: 34, meta: 33, reddit: 33 },
+    siteCategories: (body.siteCategories ?? []).map((s) => String(s).slice(0, 60)).slice(0, 20),
+    customSites: (body.customSites ?? []).map((s) => String(s).slice(0, 120)).slice(0, 25),
     industryText: summary,
     targetingJson: body.plan.targeting,
     adCopyJson: body.plan.adCopy,

@@ -13,6 +13,8 @@ create table if not exists public.users (
   email         text not null unique,
   password_hash text not null,
   full_name     text not null default '',
+  birthdate     text,
+  billing_json  jsonb,
   created_at    timestamptz not null default now()
 );
 
@@ -35,6 +37,10 @@ create table if not exists public.campaigns (
   zip               text not null default '',
   duration_months   integer not null default 1 check (duration_months between 1 and 6),
   continuous        boolean not null default false,
+  manual_mode       boolean not null default false,
+  platform_split    jsonb not null default '{"google":34,"meta":33,"reddit":33}'::jsonb,
+  site_categories   jsonb not null default '[]'::jsonb,
+  custom_sites      jsonb not null default '[]'::jsonb,
   industry_text     text not null,
   targeting_json    jsonb not null default '{}'::jsonb,
   ad_copy_json      jsonb not null default '{}'::jsonb,

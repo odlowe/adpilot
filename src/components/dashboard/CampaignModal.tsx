@@ -1,11 +1,42 @@
 "use client";
 
-import { CheckCircle2, Gauge, Loader2, MapPin, Rocket, Timer, Wand2, X } from "lucide-react";
+import {
+  CheckCircle2,
+  Gauge,
+  Loader2,
+  MapPin,
+  Plus,
+  Rocket,
+  SlidersHorizontal,
+  Sparkles,
+  Timer,
+  Wand2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import CampaignPreview from "./CampaignPreview";
 import CreativeUploader from "./CreativeUploader";
 import Slider from "@/components/ui/Slider";
-import type { CampaignDraft, CampaignPlan } from "@/lib/types";
+import type { CampaignDraft, CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
+
+const SITE_CATEGORIES = [
+  "Local news sites",
+  "Food & recipe blogs",
+  "Parenting & family",
+  "Home & DIY",
+  "Health & fitness",
+  "Sports",
+  "Shopping & deals",
+  "Entertainment",
+  "Community forums",
+  "Tech & gadgets",
+];
+
+const PLATFORM_LABELS: Record<Platform, string> = {
+  google: "Google Ads",
+  meta: "Meta Ads (Instagram & Facebook)",
+  reddit: "Reddit Ads",
+};
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -37,6 +68,39 @@ export default function CampaignModal({
   const [phase, setPhase] = useState<Phase>("editing");
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Manual Mode
+  const [manualMode, setManualMode] = useState(false);
+  const [split, setSplit] = useState<PlatformSplit>({ google: 34, meta: 33, reddit: 33 });
+  const [siteCategories, setSiteCategories] = useState<string[]>([]);
+  const [customSites, setCustomSites] = useState<string[]>([]);
+  const [siteInput, setSiteInput] = useState("");
+
+  /** Move one platform's share; the other two absorb the difference proportionally. */
+  function adjustSplit(platform: Platform, value: number) {
+    const others = (Object.keys(split) as Platform[]).filter((p) => p !== platform);
+    const remainder = 100 - value;
+    const otherTotal = split[others[0]] + split[others[1]];
+    const first =
+      otherTotal > 0 ? Math.round((split[others[0]] / otherTotal) * remainder) : Math.round(remainder / 2);
+    setSplit({
+      [platform]: value,
+      [others[0]]: first,
+      [others[1]]: remainder - first,
+    } as PlatformSplit);
+  }
+
+  function toggleCategory(category: string) {
+    setSiteCategories((current) =>
+      current.includes(category) ? current.filter((c) => c !== category) : [...current, category]
+    );
+  }
+
+  function addCustomSite() {
+    const site = siteInput.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (site && !customSites.includes(site)) setCustomSites((current) => [...current, site]);
+    setSiteInput("");
+  }
 
   const fee = Math.round(budget * 0.15);
   const busy = phase === "generating" || phase === "launching";
@@ -78,6 +142,10 @@ export default function CampaignModal({
           zip,
           durationMonths: duration,
           continuous,
+          manualMode,
+          platformSplit: split,
+          siteCategories,
+          customSites,
           industryText: intentText,
           plan,
         }),
@@ -205,6 +273,146 @@ export default function CampaignModal({
                   <div className="mt-2">
                     <CreativeUploader />
                   </div>
+                </div>
+
+                {/* ---- Manual Mode ---- */}
+                <div className={`rounded-xl border p-5 transition ${manualMode ? "border-navy-300 bg-navy-50/40" : "border-dashed border-slate-300 bg-white"}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
+                        <SlidersHorizontal size={15} className="text-emerald-600" /> Manual Mode
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {manualMode
+                          ? "You're driving. Set the exact split and where your ads appear."
+                          : "Optional — take the wheel from your agent and set the details yourself."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={manualMode}
+                      onClick={() => setManualMode((v) => !v)}
+                      className={`relative h-6 w-11 shrink-0 rounded-full transition ${manualMode ? "bg-navy-900" : "bg-slate-300"}`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${manualMode ? "left-[22px]" : "left-0.5"}`}
+                      />
+                    </button>
+                  </div>
+
+                  {manualMode ? (
+                    <div className="mt-5 space-y-6">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                          Budget split across platforms
+                        </p>
+                        <div className="mt-3 space-y-4">
+                          {(Object.keys(PLATFORM_LABELS) as Platform[]).map((platform) => (
+                            <div key={platform}>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-semibold text-navy-900">{PLATFORM_LABELS[platform]}</span>
+                                <span className="tabular-nums font-bold text-emerald-700">
+                                  {split[platform]}% · {money(Math.round((budget * split[platform]) / 100))}
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0}
+                                max={100}
+                                value={split[platform]}
+                                onChange={(e) => adjustSplit(platform, Number(e.target.value))}
+                                className="ap-range mt-1.5"
+                                style={{
+                                  background: `linear-gradient(to right, #059669 0%, #10b981 ${split[platform]}%, #e2e8f0 ${split[platform]}%, #e2e8f0 100%)`,
+                                }}
+                                aria-label={`${PLATFORM_LABELS[platform]} share of budget`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">
+                          Always adds up to 100% — move one dial and the others rebalance.
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                          Types of websites to appear on
+                        </p>
+                        <div className="mt-2.5 flex flex-wrap gap-2">
+                          {SITE_CATEGORIES.map((category) => (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => toggleCategory(category)}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                siteCategories.includes(category)
+                                  ? "border-navy-900 bg-navy-900 text-white"
+                                  : "border-slate-300 bg-white text-slate-600 hover:border-navy-400"
+                              }`}
+                            >
+                              {category}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                          Specific websites (optional)
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <input
+                            type="text"
+                            value={siteInput}
+                            onChange={(e) => setSiteInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addCustomSite();
+                              }
+                            }}
+                            placeholder="e.g., yourlocalnews.com — press Enter to add"
+                            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                          />
+                          <button
+                            type="button"
+                            onClick={addCustomSite}
+                            aria-label="Add website"
+                            className="shrink-0 rounded-xl border border-slate-300 px-3 text-slate-500 transition hover:border-emerald-500 hover:text-emerald-700"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                        {customSites.length > 0 && (
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {customSites.map((site) => (
+                              <span
+                                key={site}
+                                className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                              >
+                                {site}
+                                <button
+                                  type="button"
+                                  onClick={() => setCustomSites((current) => current.filter((s) => s !== site))}
+                                  aria-label={`Remove ${site}`}
+                                  className="text-slate-400 hover:text-navy-900"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+                      <Sparkles size={13} className="text-emerald-500" />
+                      Leave this off and your agent balances platforms and placements automatically.
+                    </p>
+                  )}
                 </div>
               </div>
 

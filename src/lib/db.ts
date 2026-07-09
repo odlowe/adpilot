@@ -23,6 +23,7 @@ const impl = useSupabase ? supabaseStore : fileStore;
 export const createUser = impl.createUser;
 export const findUserByEmail = impl.findUserByEmail;
 export const getUserById = impl.getUserById;
+export const updateUser = impl.updateUser;
 export const createBusiness = impl.createBusiness;
 export const listBusinessesByUser = impl.listBusinessesByUser;
 export const getBusinessById = impl.getBusinessById;

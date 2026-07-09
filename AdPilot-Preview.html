@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdPilot — Preview</title>
+<style>
+  :root {
+    --navy: #0b1f3a; --navy-800: #213154; --navy-700: #2b4678;
+    --emerald: #059669; --emerald-light: #10b981; --emerald-50: #ecfdf5;
+    --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b; --slate-600: #475569;
+    --shadow-card: 0 1px 2px rgba(7,21,39,.06), 0 10px 30px -12px rgba(7,21,39,.18);
+    --shadow-lift: 0 24px 48px -16px rgba(7,21,39,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--slate-50); color: var(--navy); -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; color: inherit; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+  /* preview banner */
+  .preview-note { background: var(--navy); color: #cbd5e1; text-align: center; font-size: 13px; padding: 8px 16px; }
+  .preview-note b { color: #34d399; }
+
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 40; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--slate-200); }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; }
+  .logo-badge { width: 36px; height: 36px; border-radius: 12px; background: var(--navy); color: #34d399; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo .green { color: var(--emerald); }
+  .nav-links { display: flex; gap: 28px; font-size: 14px; font-weight: 500; color: var(--slate-600); }
+  .nav-links a:hover { color: var(--navy); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; border-radius: 12px; font-weight: 600; font-size: 15px; padding: 12px 22px; transition: all .15s ease; font-family: inherit; }
+  .btn-green { background: var(--emerald); color: #fff; box-shadow: var(--shadow-card); }
+  .btn-green:hover { background: var(--emerald-light); transform: translateY(-2px); }
+  .btn-navy { background: var(--navy); color: #fff; box-shadow: var(--shadow-card); }
+  .btn-navy:hover { background: var(--navy-800); }
+  .btn-sm { padding: 9px 16px; font-size: 14px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  /* hero */
+  .hero { background: #fff; overflow: hidden; position: relative; }
+  .hero-bg { position: absolute; inset: 0; background: radial-gradient(700px 380px at 80% 10%, rgba(5,150,105,.08), transparent), radial-gradient(600px 340px at 10% 90%, rgba(11,31,58,.06), transparent); }
+  .hero-grid { position: relative; display: grid; gap: 40px; padding: 56px 0 64px; align-items: center; }
+  @media (min-width: 960px) { .hero-grid { grid-template-columns: 1fr 1fr; } }
+  .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #a7f3d0; background: var(--emerald-50); color: #047857; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 5px 12px; }
+  h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 800; line-height: 1.08; letter-spacing: -.02em; margin-top: 20px; }
+  h1 .green { color: var(--emerald); }
+  .sub { margin-top: 18px; font-size: 18px; line-height: 1.6; color: var(--slate-600); max-width: 540px; }
+  .hero-ctas { margin-top: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+  .hero-trust { margin-top: 18px; font-size: 14px; color: var(--slate-500); }
+  .link { font-weight: 600; color: var(--navy-700); font-size: 14px; }
+  .link:hover { text-decoration: underline; }
+
+  /* ---- animated scene ---- */
+  .scene-wrap { position: relative; width: 100%; height: 250px; --s: .5; user-select: none; }
+  @media (min-width: 480px) { .scene-wrap { height: 320px; --s: .68; } }
+  @media (min-width: 768px) { .scene-wrap { height: 390px; --s: .85; } }
+  @media (min-width: 1100px) { .scene-wrap { height: 440px; --s: 1; } }
+  .scene { position: absolute; left: 50%; top: 50%; width: 640px; height: 440px; transform: translate(-50%,-50%) scale(var(--s)); }
+  .ap { animation-duration: 14s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; animation-fill-mode: both; will-change: transform, opacity; position: absolute; }
+
+  @keyframes ap-table { 0%,24% {opacity:1} 34%,86% {opacity:0} 96%,100% {opacity:1} }
+  @keyframes ap-flyer {
+    0% {opacity:1; transform:rotate(-4deg) translateY(0)}
+    10% {opacity:1; transform:rotate(-4deg) translateY(-3px)}
+    14% {opacity:1; transform:rotate(-4deg) translateY(0)}
+    24%,92% {opacity:0; transform:rotate(0) translateY(-130px) scale(1.03)}
+    100% {opacity:1; transform:rotate(-4deg) translateY(0)}
+  }
+  @keyframes ap-card {
+    0%,18% {opacity:0; transform:translateY(-70px) scale(.94)}
+    26%,36% {opacity:1; transform:translateY(-130px) scale(1)}
+    43%,100% {opacity:0; transform:translateY(-130px) scale(.9)}
+  }
+  @keyframes ap-cl { 0%,36% {opacity:0; transform:translate(0,0) scale(1)} 39% {opacity:1; transform:translate(-30px,-14px) scale(.92)} 50% {opacity:1; transform:translate(-222px,-95px) scale(.44)} 56%,100% {opacity:0; transform:translate(-222px,-95px) scale(.4)} }
+  @keyframes ap-cc { 0%,36% {opacity:0; transform:translate(0,0) scale(1)} 39% {opacity:1; transform:translate(0,-16px) scale(.92)} 50% {opacity:1; transform:translate(0,-95px) scale(.44)} 56%,100% {opacity:0; transform:translate(0,-95px) scale(.4)} }
+  @keyframes ap-cr { 0%,36% {opacity:0; transform:translate(0,0) scale(1)} 39% {opacity:1; transform:translate(30px,-14px) scale(.92)} 50% {opacity:1; transform:translate(222px,-95px) scale(.44)} 56%,100% {opacity:0; transform:translate(222px,-95px) scale(.4)} }
+  @keyframes ap-mock { 0%,44% {opacity:0; transform:translateY(16px) scale(.96)} 54%,86% {opacity:1; transform:translateY(0) scale(1)} 94%,100% {opacity:0; transform:translateY(10px) scale(.97)} }
+  @keyframes ap-cap-a { 0%,8% {opacity:1} 36%,92% {opacity:0} 100% {opacity:1} }
+  @keyframes ap-cap-b { 0%,44% {opacity:0} 54%,86% {opacity:1} 94%,100% {opacity:0} }
+  @media (prefers-reduced-motion: reduce) { .ap { animation: none !important; } }
+
+  .table { animation-name: ap-table; left: 8px; right: 8px; bottom: 0; height: 140px; border-radius: 22px 22px 0 0; border-top: 1px solid rgba(245,158,11,.4); box-shadow: var(--shadow-lift);
+    background: repeating-linear-gradient(90deg, rgba(0,0,0,.1) 0 2px, transparent 2px 46px), linear-gradient(180deg, #b45309, #92400e 45%, #78350f); }
+  .table::before { content:""; position:absolute; inset:0; border-radius:22px 22px 0 0; background:linear-gradient(135deg, rgba(255,255,255,.15), transparent 50%, rgba(0,0,0,.15)); }
+  .mug { position:absolute; right:40px; top:24px; width:44px; height:44px; border-radius:50%; border:4px solid #f5f5f4; background:#451a03; box-shadow:0 4px 8px rgba(0,0,0,.3); }
+  .mug::after { content:""; position:absolute; right:-13px; top:9px; width:12px; height:20px; border:4px solid #f5f5f4; border-left:none; border-radius:0 12px 12px 0; }
+  .pencil { position:absolute; left:40px; top:64px; width:96px; height:6px; border-radius:99px; transform:rotate(-6deg); background:linear-gradient(90deg,#fda4af,#fcd34d,#44403c); box-shadow:0 2px 4px rgba(0,0,0,.25); }
+
+  .flyer { animation-name: ap-flyer; left:235px; top:292px; width:170px; background:#fafaf9; border:1px solid #d6d3d1; border-radius:3px; padding:12px; box-shadow:var(--shadow-lift); }
+  .tape { position:absolute; top:-6px; width:36px; height:14px; background:rgba(254,243,199,.85); box-shadow:0 1px 2px rgba(0,0,0,.1); }
+  .tape.l { left:-8px; transform:rotate(-45deg); } .tape.r { right:-8px; transform:rotate(45deg); }
+  .flyer .kicker { text-align:center; font-size:9px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#b45309; }
+  .flyer .name { text-align:center; font-family:Georgia,serif; font-size:15px; font-weight:700; color:#292524; margin-top:4px; }
+  .flyer .tag { text-align:center; font-size:9px; font-style:italic; color:#78716c; margin-top:2px; }
+  .flyer .rule { border-top:1px dashed #d6d3d1; margin:8px 0; }
+  .flyer .offer { text-align:center; font-size:10px; font-weight:600; color:#44403c; }
+  .flyer .addr { text-align:center; font-size:8px; color:#a8a29e; margin-top:2px; }
+
+  .dcard { animation-name: ap-card; left:235px; top:292px; width:170px; opacity:0; background:#fff; border:1px solid var(--slate-200); border-radius:12px; overflow:hidden; box-shadow:var(--shadow-lift); outline:1px solid rgba(5,150,105,.3); }
+  .dcard .bar { display:flex; align-items:center; gap:5px; background:var(--slate-50); border-bottom:1px solid var(--slate-100); padding:6px 10px; }
+  .dot { width:6px; height:6px; border-radius:50%; } .dot.r{background:#fb7185} .dot.y{background:#fbbf24} .dot.g{background:#34d399}
+  .dcard .chip { margin-left:auto; background:#d1fae5; color:#047857; font-size:7px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; border-radius:4px; padding:1px 6px; }
+  .dcard .body { padding:10px; }
+  .media { border-radius:6px; background:linear-gradient(135deg,#fde68a,#fcd34d,#fdba74); }
+  .dcard .media { height:36px; }
+  .dcard .t1 { font-size:11px; font-weight:700; margin-top:6px; }
+  .dcard .t2 { font-size:8.5px; color:var(--slate-500); }
+  .dcard .cta { margin-top:6px; background:var(--emerald); color:#fff; font-size:9px; font-weight:600; text-align:center; border-radius:6px; padding:4px; }
+
+  .clone { width:170px; opacity:0; background:#fff; border:1px solid var(--slate-200); border-radius:12px; padding:10px; box-shadow:var(--shadow-lift); outline:1px solid rgba(5,150,105,.3); left:235px; top:162px; }
+  .clone.l{animation-name:ap-cl} .clone.c{animation-name:ap-cc} .clone.r{animation-name:ap-cr}
+  .clone .media { height:32px; }
+  .clone .ln1 { height:8px; width:75%; border-radius:4px; background:#c2d2e9; margin-top:6px; }
+  .clone .ln2 { height:6px; width:50%; border-radius:4px; background:var(--slate-200); margin-top:4px; }
+  .clone .btn-ln { height:16px; border-radius:6px; background:var(--emerald); margin-top:6px; }
+
+  .mock { animation-name: ap-mock; top:0; width:196px; background:#fff; border:1px solid var(--slate-200); border-radius:16px; overflow:hidden; box-shadow:var(--shadow-card); font-size:10px; }
+  .mock.g{left:0} .mock.i{left:222px} .mock.r{left:444px}
+  .g-head { border-bottom:1px solid var(--slate-100); padding:10px 12px 8px; text-align:center; }
+  .g-word { font-size:13px; font-weight:700; letter-spacing:-.01em; }
+  .g-word .b{color:#3b82f6} .g-word .r{color:#ef4444} .g-word .y{color:#f59e0b} .g-word .gr{color:var(--emerald)}
+  .g-search { margin-top:6px; display:flex; align-items:center; gap:6px; border:1px solid var(--slate-200); border-radius:99px; padding:4px 10px; font-size:8.5px; color:var(--slate-600); text-align:left; }
+  .g-body { padding:10px 12px; }
+  .g-spon { font-size:8px; font-weight:700; }
+  .g-title { font-size:10.5px; color:#1d4ed8; font-weight:500; margin-top:4px; line-height:1.25; }
+  .g-url { font-size:8px; color:#047857; }
+  .g-desc { font-size:8px; color:var(--slate-500); margin-top:2px; line-height:1.4; }
+  .g-skel { height:6px; border-radius:3px; background:var(--slate-100); margin-top:6px; }
+  .ig-head { display:flex; align-items:center; gap:6px; padding:8px 10px; }
+  .ig-av { width:20px; height:20px; border-radius:50%; background:linear-gradient(45deg,#fbbf24,#f43f5e,#a855f7); padding:1px; }
+  .ig-av span { display:block; width:100%; height:100%; border-radius:50%; border:1px solid #fff; background:#fde68a; }
+  .ig-name { font-size:9px; font-weight:600; } .ig-spon { font-size:7px; color:var(--slate-400); }
+  .ig-media { height:86px; display:flex; align-items:center; justify-content:center; }
+  .ig-media .tagcard { background:rgba(255,255,255,.85); border-radius:6px; padding:4px 8px; text-align:center; box-shadow:0 1px 2px rgba(0,0,0,.1); }
+  .ig-media .tagcard b { font-size:9px; color:#292524; } .ig-media .tagcard span { display:block; font-size:7px; color:#78716c; }
+  .ig-cta { display:flex; justify-content:space-between; background:#3b82f6; color:#fff; font-size:9px; font-weight:600; padding:6px 10px; }
+  .ig-actions { display:flex; gap:8px; padding:6px 10px; color:var(--slate-600); font-size:10px; }
+  .rd-head { display:flex; align-items:center; gap:6px; padding:10px 10px 0; }
+  .rd-av { width:20px; height:20px; border-radius:50%; background:#f97316; color:#fff; font-size:8px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .rd-sub { font-size:9px; font-weight:600; } .rd-prom { font-size:7px; color:#2563eb; font-weight:500; }
+  .rd-title { padding:6px 10px 0; font-size:9.5px; font-weight:600; line-height:1.35; }
+  .rd-media { margin:6px 10px 0; height:62px; border-radius:8px; }
+  .rd-foot { display:flex; gap:10px; padding:8px 10px; color:var(--slate-500); font-size:8px; align-items:center; }
+  .rd-votes { display:flex; gap:3px; align-items:center; background:var(--slate-100); border-radius:99px; padding:2px 7px; font-weight:700; }
+
+  .caption { position:relative; height:24px; text-align:center; font-size:14px; font-weight:500; color:var(--slate-500); margin-top:6px; }
+  .caption span { position:absolute; left:0; right:0; }
+  .cap-a { animation-name: ap-cap-a; } .cap-b { animation-name: ap-cap-b; opacity:0; }
+  .caption .ap { position:absolute; }
+
+  /* sections */
+  section { padding: 76px 0; }
+  .sec-slate { background: var(--slate-50); } .sec-white { background: #fff; }
+  .sec-head { text-align: center; max-width: 620px; margin: 0 auto; }
+  h2 { font-size: clamp(28px, 3.5vw, 38px); font-weight: 800; letter-spacing: -.02em; }
+  .sec-head p { margin-top: 12px; font-size: 18px; color: var(--slate-600); }
+  .cards3 { display: grid; gap: 22px; margin-top: 46px; }
+  @media (min-width: 768px) { .cards3 { grid-template-columns: repeat(3, 1fr); } }
+  .card { background: #fff; border: 1px solid var(--slate-200); border-radius: 18px; padding: 28px; box-shadow: var(--shadow-card); transition: all .2s ease; }
+  .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lift); }
+  .card .icon { width: 48px; height: 48px; border-radius: 12px; background: var(--navy); color: #34d399; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .card .step { margin-top: 18px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--emerald); }
+  .card h3 { margin-top: 6px; font-size: 18px; }
+  .card p { margin-top: 10px; color: var(--slate-600); line-height: 1.6; font-size: 15px; }
+
+  /* sliders */
+  .slider-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .slider-label { font-size: 14px; font-weight: 600; }
+  .slider-value { background: var(--emerald-50); color: #047857; border: 1px solid #a7f3d0; font-weight: 700; font-size: 18px; border-radius: 10px; padding: 4px 12px; font-variant-numeric: tabular-nums; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 99px; background: var(--slate-200); outline: none; cursor: pointer; margin-top: 14px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 26px; width: 26px; border-radius: 50%; background: #fff; border: 4px solid var(--emerald); box-shadow: 0 2px 6px rgba(7,21,39,.28); transition: transform .12s; }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.08); }
+  input[type=range]::-moz-range-thumb { height: 26px; width: 26px; border-radius: 50%; background: #fff; border: 4px solid var(--emerald); box-shadow: 0 2px 6px rgba(7,21,39,.28); cursor: pointer; }
+  .hints { display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; color: var(--slate-400); margin-top: 6px; }
+
+  /* pricing */
+  .price-grid { display: grid; gap: 22px; margin-top: 46px; max-width: 900px; margin-left: auto; margin-right: auto; }
+  @media (min-width: 900px) { .price-grid { grid-template-columns: 3fr 2fr; } }
+  .calc { background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 18px; padding: 28px; box-shadow: var(--shadow-card); }
+  .kicker-sm { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--emerald); }
+  .calc dl { margin-top: 26px; font-size: 15px; }
+  .calc dl > div { display: flex; justify-content: space-between; padding: 6px 0; color: var(--slate-600); }
+  .calc dd { font-weight: 600; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .calc .total { border-top: 1px solid var(--slate-300); margin-top: 8px; padding-top: 14px !important; font-size: 18px; font-weight: 700; color: var(--navy); }
+  .calc .total dd { color: #047857; font-weight: 800; }
+  .calc .note { margin-top: 14px; font-size: 13px; color: var(--slate-500); line-height: 1.5; }
+  .included { background: var(--navy); border-radius: 18px; padding: 28px; color: #fff; box-shadow: var(--shadow-lift); }
+  .included .kicker-sm { color: #34d399; }
+  .included ul { list-style: none; margin-top: 18px; }
+  .included li { display: flex; gap: 10px; font-size: 14px; line-height: 1.55; color: var(--slate-200); padding: 7px 0; }
+  .included li::before { content: "✓"; color: #34d399; font-weight: 700; flex-shrink: 0; }
+  .included .btn { width: 100%; justify-content: center; margin-top: 22px; }
+  .included .fine { text-align: center; font-size: 12px; color: var(--slate-400); margin-top: 10px; }
+
+  /* dashboard demo */
+  .dash-panel { background: #fff; border: 1px solid var(--slate-200); border-radius: 18px; padding: 32px; box-shadow: var(--shadow-card); margin-top: 40px; }
+  .dash-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; }
+  .dash-title .spark { color: var(--emerald); }
+  .dash-grid { display: grid; gap: 34px; margin-top: 28px; }
+  @media (min-width: 800px) { .dash-grid { grid-template-columns: 1fr 1fr; } }
+  .fee-note { margin-top: 18px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; padding: 10px 16px; font-size: 14px; color: var(--slate-600); }
+  .fee-note b { color: var(--navy); }
+  textarea { width: 100%; margin-top: 8px; border: 1px solid var(--slate-300); border-radius: 12px; padding: 14px 16px; font-size: 15px; line-height: 1.6; font-family: inherit; resize: vertical; min-height: 110px; outline: none; transition: all .15s; }
+  textarea:focus { border-color: var(--emerald); box-shadow: 0 0 0 4px rgba(5,150,105,.12); }
+  .field-label { display: block; margin-top: 26px; font-size: 14px; font-weight: 600; }
+  .field-label .opt { font-weight: 400; color: var(--slate-400); }
+  .drop { margin-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; border: 2px dashed var(--slate-300); background: var(--slate-50); border-radius: 12px; padding: 30px 20px; text-align: center; cursor: pointer; transition: all .15s; width: 100%; font-family: inherit; }
+  .drop:hover, .drop.drag { border-color: var(--emerald); background: var(--emerald-50); }
+  .drop .circ { width: 44px; height: 44px; border-radius: 50%; background: #fff; color: var(--emerald); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-card); font-size: 18px; }
+  .drop b { font-size: 14px; } .drop small { font-size: 12px; color: var(--slate-400); }
+  .file-chip { margin-top: 8px; display: none; align-items: center; gap: 12px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 16px; font-size: 14px; }
+  .file-chip img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--slate-200); }
+  .file-chip .x { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--slate-400); font-size: 16px; padding: 6px; }
+
+  .thinking { display: none; margin-top: 22px; border: 2px dashed #6ee7b7; background: rgba(236,253,245,.6); border-radius: 18px; padding: 32px; text-align: center; }
+  .spinner { width: 28px; height: 28px; border: 3px solid #a7f3d0; border-top-color: var(--emerald); border-radius: 50%; margin: 0 auto; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .thinking b { display: block; margin-top: 12px; } .thinking small { color: var(--slate-500); }
+
+  .result { display: none; margin-top: 22px; border: 1px solid var(--slate-200); border-radius: 18px; overflow: hidden; background: #fff; box-shadow: var(--shadow-card); }
+  .result-head { background: var(--navy); color: #fff; padding: 16px 28px; }
+  .result-head b { font-size: 16px; } .result-head p { font-size: 13px; color: var(--slate-300); margin-top: 2px; }
+  .result-body { display: grid; gap: 30px; padding: 28px; }
+  @media (min-width: 800px) { .result-body { grid-template-columns: 1fr 1fr; } }
+  .rsec-title { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--slate-400); margin-top: 22px; }
+  .rsec-title:first-child { margin-top: 0; }
+  .headline-item { background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; padding: 10px 16px; font-weight: 600; font-size: 15px; margin-top: 8px; }
+  .desc-item { border: 1px solid var(--slate-200); border-radius: 12px; padding: 10px 16px; font-size: 14px; color: var(--slate-600); line-height: 1.55; margin-top: 8px; }
+  .aud { background: var(--emerald-50); border: 1px solid #a7f3d0; color: #065f46; border-radius: 12px; padding: 12px 16px; font-size: 14px; line-height: 1.55; margin-top: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip { border-radius: 99px; padding: 5px 12px; font-size: 12px; font-weight: 600; border: 1px solid; }
+  .chip.blue { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+  .chip.rose { background: #fff1f2; color: #9f1239; border-color: #fecdd3; }
+  .chip.orange { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
+
+  .launch-bar { display: none; margin-top: 22px; background: #fff; border: 1px solid var(--slate-200); border-radius: 18px; padding: 22px 28px; box-shadow: var(--shadow-card); gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .launch-bar p { font-size: 14px; color: var(--slate-600); }
+  .success { display: none; margin-top: 22px; background: #fff; border: 1px solid #a7f3d0; border-radius: 18px; padding: 44px; text-align: center; box-shadow: var(--shadow-card); }
+  .success .big { width: 64px; height: 64px; border-radius: 50%; background: #d1fae5; color: var(--emerald); font-size: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+  .success h3 { font-size: 24px; margin-top: 18px; }
+  .success p { color: var(--slate-600); margin-top: 8px; max-width: 440px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+  .statuses { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  .status-chip { border-radius: 99px; padding: 6px 14px; font-size: 13px; font-weight: 600; background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+
+  /* cta + footer */
+  .cta-band { background: var(--navy); text-align: center; }
+  .cta-band h2 { color: #fff; }
+  .cta-band p { color: var(--slate-300); font-size: 18px; margin-top: 12px; }
+  footer { background: #fff; border-top: 1px solid var(--slate-200); }
+  .foot-inner { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; padding: 36px 0; font-size: 14px; color: var(--slate-400); }
+  @media (max-width: 700px) { .nav-links { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="preview-note"><b>Preview mode</b> — this is a working demo of your AdPilot website. Try the sliders and buttons below; nothing is saved or billed.</div>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a class="logo" href="#top"><span class="logo-badge">➤</span>Ad<span class="green">Pilot</span></a>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#dashboard">Dashboard demo</a>
+    </div>
+    <a class="btn btn-green btn-sm" href="#dashboard">Get started free</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="top">
+  <div class="hero-bg"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <span class="pill">✦ Your Automated AI Marketing Agent</span>
+      <h1>Get Local Customers on Autopilot. <span class="green">No Tech Skills Required.</span></h1>
+      <p class="sub">Set a budget with one slider, describe your ideal customer in plain English, and your smart helper writes, targets, and runs your ads on Google, Instagram, and Reddit — all at once.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-green" href="#dashboard">Launch Your First Ad Free →</a>
+        <a class="link" href="#how">See how it works</a>
+      </div>
+      <p class="hero-trust">✓ No contracts. Pause anytime. Set up in under 5 minutes.</p>
+    </div>
+    <div>
+      <div class="scene-wrap" aria-hidden="true">
+        <div class="scene">
+          <!-- mockups -->
+          <div class="ap mock g">
+            <div class="g-head">
+              <div class="g-word"><span class="b">G</span><span class="r">o</span><span class="y">o</span><span class="b">g</span><span class="gr">l</span><span class="r">e</span></div>
+              <div class="g-search">🔍 bakery near me</div>
+            </div>
+            <div class="g-body">
+              <div class="g-spon">Sponsored</div>
+              <div class="g-title">Main St. Bakery — Fresh Sourdough Daily</div>
+              <div class="g-url">mainstbakery.com</div>
+              <div class="g-desc">Locally owned. Baked fresh every morning. Stop in for 20% off your first loaf.</div>
+              <div class="g-skel" style="width:92%"></div>
+              <div class="g-skel" style="width:78%"></div>
+            </div>
+          </div>
+          <div class="ap mock i">
+            <div class="ig-head">
+              <span class="ig-av"><span></span></span>
+              <div><div class="ig-name">mainstbakery</div><div class="ig-spon">Sponsored</div></div>
+            </div>
+            <div class="ig-media media">
+              <div class="tagcard"><b>Main St. Bakery</b><span>Fresh sourdough daily</span></div>
+            </div>
+            <div class="ig-cta"><span>Learn More</span><span>›</span></div>
+            <div class="ig-actions"><span>♡</span><span>💬</span><span>➹</span></div>
+          </div>
+          <div class="ap mock r">
+            <div class="rd-head">
+              <span class="rd-av">r/</span>
+              <div><div class="rd-sub">r/LocalEats</div><div class="rd-prom">Promoted</div></div>
+            </div>
+            <div class="rd-title">The sourdough everyone in town is talking about</div>
+            <div class="rd-media media"></div>
+            <div class="rd-foot">
+              <span class="rd-votes">▲ 128 ▼</span><span>💬 24</span><span>↗ Share</span>
+            </div>
+          </div>
+          <!-- table -->
+          <div class="ap table"><div class="mug"></div><div class="pencil"></div></div>
+          <!-- flyer -->
+          <div class="ap flyer">
+            <div class="tape l"></div><div class="tape r"></div>
+            <div class="kicker">Grand Opening</div>
+            <div class="name">Main St. Bakery</div>
+            <div class="tag">Fresh sourdough, baked daily</div>
+            <div class="rule"></div>
+            <div class="offer">20% off with this flyer</div>
+            <div class="addr">142 Main Street · Open 7am–3pm</div>
+          </div>
+          <!-- digital card -->
+          <div class="ap dcard">
+            <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="chip">Digital Ad</span></div>
+            <div class="body">
+              <div class="media"></div>
+              <div class="t1">Main St. Bakery</div>
+              <div class="t2">Fresh sourdough, baked daily</div>
+              <div class="cta">Learn More</div>
+            </div>
+          </div>
+          <!-- clones -->
+          <div class="ap clone l"><div class="media"></div><div class="ln1"></div><div class="ln2"></div><div class="btn-ln"></div></div>
+          <div class="ap clone c"><div class="media"></div><div class="ln1"></div><div class="ln2"></div><div class="btn-ln"></div></div>
+          <div class="ap clone r"><div class="media"></div><div class="ln1"></div><div class="ln2"></div><div class="btn-ln"></div></div>
+        </div>
+      </div>
+      <div class="caption">
+        <span class="ap cap-a">Your ad starts as an idea on the kitchen table…</span>
+        <span class="ap cap-b">…and goes live on Google, Instagram &amp; Reddit. Automatically.</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- HOW IT WORKS -->
+<section class="sec-slate" id="how">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Three steps. Zero jargon.</h2>
+      <p>If you can order takeout online, you can launch a professional ad campaign.</p>
+    </div>
+    <div class="cards3">
+      <div class="card">
+        <div class="icon">⇄</div>
+        <div class="step">Step 1</div>
+        <h3>Set Your Budget Slider</h3>
+        <p>Pick any amount from $100 to $5,000 a month. One slider — that's the whole setup. Your smart helper spreads it across platforms so every dollar works hard.</p>
+      </div>
+      <div class="card">
+        <div class="icon">💬</div>
+        <div class="step">Step 2</div>
+        <h3>Describe Your Customer in Plain English</h3>
+        <p>Type it the way you'd say it: "moms nearby who love eco-friendly clothing." Your automated agent turns that into professional ad copy and precise targeting.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🚀</div>
+        <div class="step">Step 3</div>
+        <h3>Hit Launch</h3>
+        <p>Review what the agent wrote, then press one button. Your ads go live on Google, Instagram, and Reddit — and the agent keeps tuning them while you run your business.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="sec-white" id="pricing">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>One simple fee. No surprises.</h2>
+      <p>You choose your ad budget — every dollar of it goes to your ads. We add a flat <b style="color:var(--navy)">15% management fee</b> for your automated agent. That's the whole pricing page.</p>
+    </div>
+    <div class="price-grid">
+      <div class="calc">
+        <div class="kicker-sm">Try the math yourself</div>
+        <div style="margin-top:24px">
+          <div class="slider-row">
+            <span class="slider-label">Monthly ad budget</span>
+            <span class="slider-value" id="calcVal">$500</span>
+          </div>
+          <input type="range" id="calcSlider" min="100" max="5000" step="50" value="500">
+          <div class="hints"><span>$100</span><span>$5,000</span></div>
+        </div>
+        <dl>
+          <div><dt>Goes straight to your ads</dt><dd id="calcSpend">$500</dd></div>
+          <div><dt>Software fee (15%) — your agent's salary</dt><dd id="calcFee">$75</dd></div>
+          <div class="total"><dt>Total monthly billing</dt><dd id="calcTotal">$575</dd></div>
+        </dl>
+        <p class="note" id="calcNote">Example: $500 ad spend + $75 software fee = $575 total. Slide the bar — the math updates instantly.</p>
+      </div>
+      <div class="included">
+        <div class="kicker-sm">Always included</div>
+        <ul>
+          <li>Ad copy written and refreshed by your automated agent</li>
+          <li>Placement on Google, Instagram &amp; Reddit — one campaign, three platforms</li>
+          <li>Local radius targeting tuned to your neighborhood</li>
+          <li>Ongoing optimization: budget shifts toward whatever is working</li>
+          <li>Plain-English performance updates, no dashboards to decode</li>
+        </ul>
+        <a class="btn btn-green" href="#dashboard">Launch Your First Ad Free</a>
+        <p class="fine">No contracts. Cancel or pause anytime.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD DEMO -->
+<section class="sec-slate" id="dashboard">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Try the dashboard</h2>
+      <p>This is the whole product: two sliders, one text box, one button. Go ahead — it works right here in the preview.</p>
+    </div>
+
+    <div class="dash-panel">
+      <div class="dash-title"><span class="spark">✦</span> New campaign</div>
+      <div class="dash-grid">
+        <div>
+          <div class="slider-row">
+            <span class="slider-label">Monthly budget</span>
+            <span class="slider-value" id="budgetVal">$750</span>
+          </div>
+          <input type="range" id="budgetSlider" min="100" max="5000" step="50" value="750">
+          <div class="hints"><span>$100</span><span>$5,000</span></div>
+        </div>
+        <div>
+          <div class="slider-row">
+            <span class="slider-label">Local reach</span>
+            <span class="slider-value" id="radiusVal">10 miles</span>
+          </div>
+          <input type="range" id="radiusSlider" min="1" max="50" value="10">
+          <div class="hints"><span>1 mile</span><span>50 miles</span></div>
+        </div>
+      </div>
+      <div class="fee-note" id="feeNote">$750 ad spend + $113 software fee (15%) = <b>$863 total per month</b></div>
+
+      <label class="field-label" for="intent">Who are your customers? Say it in your own words.</label>
+      <textarea id="intent" placeholder="e.g., I run a boutique dress shop in town and want to target moms who care about sustainable, eco-friendly clothing..."></textarea>
+
+      <span class="field-label">Add a photo or video <span class="opt">(optional — we can generate one)</span></span>
+      <button type="button" class="drop" id="drop">
+        <span class="circ">🖼</span>
+        <b>Drag a photo or video here, or click to browse</b>
+        <small>JPG, PNG, or MP4 — whatever you have works</small>
+      </button>
+      <div class="file-chip" id="fileChip">
+        <img id="fileThumb" alt="" style="display:none">
+        <div><b id="fileName"></b><br><small id="fileMeta" style="color:var(--slate-500)"></small></div>
+        <button class="x" id="fileRemove" aria-label="Remove">✕</button>
+      </div>
+      <input type="file" id="fileInput" accept="image/*,video/*" style="display:none">
+
+      <div style="margin-top:26px">
+        <button class="btn btn-navy" id="genBtn">✨ Generate Campaign Preview</button>
+      </div>
+    </div>
+
+    <div class="thinking" id="thinking">
+      <div class="spinner"></div>
+      <b>Writing your ads and mapping your audience…</b>
+      <small>Headlines, keywords, and interest groups — usually done in a few seconds.</small>
+    </div>
+
+    <div class="result" id="result">
+      <div class="result-head">
+        <b>Here's what your agent built</b>
+        <p id="reachLine"></p>
+      </div>
+      <div class="result-body">
+        <div>
+          <div class="rsec-title">Headlines it wrote for you</div>
+          <div id="headlines"></div>
+          <div class="rsec-title">Ad descriptions</div>
+          <div id="descs"></div>
+        </div>
+        <div>
+          <div class="rsec-title">Who it will reach</div>
+          <div class="aud" id="audience"></div>
+          <div class="rsec-title">Google — search terms it will bid on</div>
+          <div class="chips" id="gChips"></div>
+          <div class="rsec-title">Instagram &amp; Facebook — interest groups</div>
+          <div class="chips" id="mChips"></div>
+          <div class="rsec-title">Reddit — communities &amp; interests</div>
+          <div class="chips" id="rChips"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="launch-bar" id="launchBar">
+      <p>Happy with it? One click puts this live on all three platforms — <b id="launchTotal"></b>/month, pause anytime.</p>
+      <button class="btn btn-green" id="launchBtn">🚀 Launch Everywhere</button>
+    </div>
+
+    <div class="success" id="success">
+      <div class="big">✓</div>
+      <h3>Your campaign is on its way!</h3>
+      <p>It's been submitted to Google, Instagram, and Reddit for a quick review — most campaigns go live within 24 hours. We'll take it from here.</p>
+      <div class="statuses">
+        <span class="status-chip">Google: In review</span>
+        <span class="status-chip">Instagram: In review</span>
+        <span class="status-chip">Reddit: In review</span>
+      </div>
+      <button class="btn btn-navy" id="againBtn" style="margin-top:24px">Create another campaign</button>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-band">
+  <div class="wrap">
+    <h2>Your next regular is scrolling right now.</h2>
+    <p>Give your smart helper five minutes and a budget — it handles the rest.</p>
+    <a class="btn btn-green" href="#dashboard" style="margin-top:26px">Launch Your First Ad Free →</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <a class="logo" href="#top"><span class="logo-badge">➤</span>Ad<span class="green">Pilot</span></a>
+    <span>© 2026 AdPilot. Made for main street.</span>
+  </div>
+</footer>
+
+<script>
+  var money = function (n) { return "$" + Math.round(n).toLocaleString("en-US"); };
+
+  // ---- pricing calculator ----
+  var calcSlider = document.getElementById("calcSlider");
+  function updateCalc() {
+    var spend = Number(calcSlider.value), fee = Math.round(spend * 0.15);
+    document.getElementById("calcVal").textContent = money(spend);
+    document.getElementById("calcSpend").textContent = money(spend);
+    document.getElementById("calcFee").textContent = money(fee);
+    document.getElementById("calcTotal").textContent = money(spend + fee);
+    document.getElementById("calcNote").textContent =
+      "Example: " + money(spend) + " ad spend + " + money(fee) + " software fee = " + money(spend + fee) + " total. Slide the bar — the math updates instantly.";
+  }
+  calcSlider.addEventListener("input", updateCalc);
+
+  // ---- dashboard sliders ----
+  var budgetSlider = document.getElementById("budgetSlider");
+  var radiusSlider = document.getElementById("radiusSlider");
+  function updateDash() {
+    var b = Number(budgetSlider.value), r = Number(radiusSlider.value), fee = Math.round(b * 0.15);
+    document.getElementById("budgetVal").textContent = money(b);
+    document.getElementById("radiusVal").textContent = r + (r === 1 ? " mile" : " miles");
+    document.getElementById("feeNote").innerHTML =
+      money(b) + " ad spend + " + money(fee) + " software fee (15%) = <b>" + money(b + fee) + " total per month</b>";
+  }
+  budgetSlider.addEventListener("input", updateDash);
+  radiusSlider.addEventListener("input", updateDash);
+
+  // slider fill
+  function paintRange(el) {
+    var pct = (el.value - el.min) / (el.max - el.min) * 100;
+    el.style.background = "linear-gradient(to right,#059669 0%,#10b981 " + pct + "%,#e2e8f0 " + pct + "%,#e2e8f0 100%)";
+  }
+  [calcSlider, budgetSlider, radiusSlider].forEach(function (el) {
+    paintRange(el);
+    el.addEventListener("input", function () { paintRange(el); });
+  });
+
+  // ---- uploader ----
+  var drop = document.getElementById("drop"), fileInput = document.getElementById("fileInput"), chip = document.getElementById("fileChip");
+  drop.addEventListener("click", function () { fileInput.click(); });
+  drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", function () { drop.classList.remove("drag"); });
+  drop.addEventListener("drop", function (e) { e.preventDefault(); drop.classList.remove("drag"); acceptFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener("change", function () { acceptFile(fileInput.files[0]); });
+  function acceptFile(f) {
+    if (!f) return;
+    var isImg = f.type.indexOf("image/") === 0, isVid = f.type.indexOf("video/") === 0;
+    if (!isImg && !isVid) return;
+    document.getElementById("fileName").textContent = f.name;
+    document.getElementById("fileMeta").textContent = (isVid ? "Video" : "Photo") + " · " + (f.size / 1048576).toFixed(1) + " MB — looks great, we'll fit it to every platform.";
+    var thumb = document.getElementById("fileThumb");
+    if (isImg) { thumb.src = URL.createObjectURL(f); thumb.style.display = "block"; } else { thumb.style.display = "none"; }
+    drop.style.display = "none"; chip.style.display = "flex";
+  }
+  document.getElementById("fileRemove").addEventListener("click", function () {
+    chip.style.display = "none"; drop.style.display = "flex"; fileInput.value = "";
+  });
+
+  // ---- the "smart helper" (same logic as the real app, simplified) ----
+  var verticals = [
+    { re: /baker|pastr|sourdough|cafe|coffee|donut|dessert/i, noun: "bakery & café",
+      kw: ["bakery near me", "best coffee shop near me", "fresh bread near me", "pastries open now"],
+      meta: ["Baking", "Coffee culture", "Foodies", "Local food"], rd: ["r/Breadit", "r/Coffee", "Local city subreddit", "r/food"] },
+    { re: /restaurant|pizza|taco|sushi|burger|dinner|catering/i, noun: "restaurant",
+      kw: ["restaurants near me", "best dinner near me", "food delivery near me", "lunch specials"],
+      meta: ["Dining out", "Foodies", "Date night", "Family activities"], rd: ["Local city subreddit", "r/food", "r/FoodPorn", "r/AskCulinary"] },
+    { re: /boutique|dress|cloth|apparel|fashion|shoe|jewel/i, noun: "boutique",
+      kw: ["boutique near me", "sustainable clothing store", "women's dress shop near me", "local fashion"],
+      meta: ["Sustainable fashion", "Boutique shopping", "Eco-friendly products", "Style & trends"], rd: ["r/femalefashionadvice", "r/sustainability", "Local city subreddit", "r/frugalfemalefashion"] },
+    { re: /salon|spa|barber|nail|lash|hair|massage|beauty/i, noun: "salon & spa",
+      kw: ["hair salon near me", "spa day near me", "best barber near me", "nail salon open now"],
+      meta: ["Beauty & self-care", "Wellness", "Haircare", "Spa days"], rd: ["r/Hair", "r/SkincareAddiction", "Local city subreddit", "r/malegrooming"] },
+    { re: /gym|fitness|yoga|pilates|crossfit|trainer/i, noun: "fitness studio",
+      kw: ["gym membership near me", "yoga classes near me", "personal trainer near me", "fitness classes"],
+      meta: ["Fitness & wellness", "Yoga", "Healthy lifestyle", "New year goals"], rd: ["r/Fitness", "r/yoga", "Local city subreddit", "r/xxfitness"] },
+    { re: /plumb|hvac|electric|roof|landscap|contractor|handyman|clean|pest/i, noun: "home services company",
+      kw: ["plumber near me", "emergency repair near me", "licensed contractor near me", "free estimate home repair"],
+      meta: ["Homeowners", "Home improvement", "DIY & renovation", "New movers"], rd: ["r/HomeImprovement", "Local city subreddit", "r/Plumbing", "r/DIY"] },
+    { re: /pet|dog|cat|groom/i, noun: "pet business",
+      kw: ["dog groomer near me", "pet store near me", "dog daycare near me", "puppy training classes"],
+      meta: ["Dog lovers", "Pet parents", "Animal welfare", "Local community"], rd: ["r/dogs", "r/Pets", "Local city subreddit", "r/puppy101"] }
+  ];
+  var generic = { noun: "local business",
+    kw: ["shops near me", "best local business near me", "open now near me", "locally owned"],
+    meta: ["Shop local", "Small business supporters", "Local community", "Deals & offers"],
+    rd: ["Local city subreddit", "r/smallbusiness", "r/BuyItForLife", "r/deals"] };
+  var hints = [
+    { re: /mom|mother|parent|famil/i, meta: "Parents with young children", rd: "r/Parenting" },
+    { re: /sustain|eco|green|organic|environment/i, meta: "Sustainable living", rd: "r/ZeroWaste" },
+    { re: /student|college|campus/i, meta: "College students", rd: "r/college" },
+    { re: /senior|retire/i, meta: "Adults 55+", rd: "r/retirement" },
+    { re: /wedding|bride|engag/i, meta: "Recently engaged", rd: "r/weddingplanning" },
+    { re: /luxur|premium|high[- ]end/i, meta: "Luxury shoppers", rd: "r/BuyItForLife" },
+    { re: /budget|afford|deal|discount/i, meta: "Deal seekers", rd: "r/Frugal" }
+  ];
+
+  function chipEls(id, list, cls) {
+    var box = document.getElementById(id); box.innerHTML = "";
+    list.forEach(function (c) {
+      var s = document.createElement("span"); s.className = "chip " + cls; s.textContent = c; box.appendChild(s);
+    });
+  }
+
+  var genBtn = document.getElementById("genBtn");
+  genBtn.addEventListener("click", function () {
+    var intent = document.getElementById("intent").value.trim();
+    if (intent.length < 12) {
+      document.getElementById("intent").focus();
+      document.getElementById("intent").placeholder = "Tell us a little about your business and customers first — just a sentence or two!";
+      return;
+    }
+    var budget = Number(budgetSlider.value), radius = Number(radiusSlider.value);
+    document.getElementById("result").style.display = "none";
+    document.getElementById("launchBar").style.display = "none";
+    document.getElementById("success").style.display = "none";
+    document.getElementById("thinking").style.display = "block";
+    genBtn.disabled = true;
+    document.getElementById("thinking").scrollIntoView({ behavior: "smooth", block: "center" });
+
+    setTimeout(function () {
+      var v = null;
+      for (var i = 0; i < verticals.length; i++) { if (verticals[i].re.test(intent)) { v = verticals[i]; break; } }
+      if (!v) v = generic;
+      var nameMatch = intent.match(/([A-Z][\w'&]+(?:\s+[A-Z][\w'&.]+){0,3})/);
+      var name = nameMatch ? nameMatch[1] : "Your Business";
+      var meta = v.meta.slice(), rd = v.rd.slice();
+      hints.forEach(function (h) { if (h.re.test(intent)) { meta.unshift(h.meta); rd.unshift(h.rd); } });
+
+      document.getElementById("reachLine").textContent =
+        "Estimated " + (budget * 35).toLocaleString() + "–" + (budget * 60).toLocaleString() + " neighbors reached per month · " + radius + " mile radius";
+      var hl = document.getElementById("headlines"); hl.innerHTML = "";
+      [name + ": The " + v.noun + " your neighbors keep recommending",
+       "Looking for a great " + v.noun + " within " + radius + " miles? Found it.",
+       "Locally owned. Loved by locals. Come see why.",
+       "Your new favorite " + v.noun + " is closer than you think"
+      ].forEach(function (h) { var d = document.createElement("div"); d.className = "headline-item"; d.textContent = h; hl.appendChild(d); });
+      var ds = document.getElementById("descs"); ds.innerHTML = "";
+      ["Proudly serving the neighborhood. Stop in this week and see what everyone's talking about — no appointment needed.",
+       "Real people, real service, right around the corner. Visit " + name + " today or reach out for details.",
+       "Support local and get treated like a regular from day one. We're " + (radius <= 5 ? "just minutes" : "a short drive") + " away."
+      ].forEach(function (t) { var d = document.createElement("div"); d.className = "desc-item"; d.textContent = t; ds.appendChild(d); });
+      document.getElementById("audience").textContent =
+        'People within ' + radius + ' miles who match: "' + (intent.length > 160 ? intent.slice(0, 160) + "…" : intent) + '"';
+      chipEls("gChips", v.kw, "blue");
+      chipEls("mChips", meta.slice(0, 6), "rose");
+      chipEls("rChips", rd.slice(0, 6), "orange");
+
+      var fee = Math.round(budget * 0.15);
+      document.getElementById("launchTotal").textContent = money(budget + fee);
+      document.getElementById("thinking").style.display = "none";
+      document.getElementById("result").style.display = "block";
+      document.getElementById("launchBar").style.display = "flex";
+      genBtn.disabled = false;
+      document.getElementById("result").scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 1800);
+  });
+
+  document.getElementById("launchBtn").addEventListener("click", function () {
+    var btn = this;
+    btn.disabled = true; btn.textContent = "Launching…";
+    setTimeout(function () {
+      document.getElementById("result").style.display = "none";
+      document.getElementById("launchBar").style.display = "none";
+      document.getElementById("success").style.display = "block";
+      document.getElementById("success").scrollIntoView({ behavior: "smooth", block: "center" });
+      btn.disabled = false; btn.textContent = "🚀 Launch Everywhere";
+    }, 1200);
+  });
+
+  document.getElementById("againBtn").addEventListener("click", function () {
+    document.getElementById("success").style.display = "none";
+    document.getElementById("intent").value = "";
+    document.getElementById("dashboard").scrollIntoView({ behavior: "smooth" });
+  });
+</script>
+</body>
+</html>

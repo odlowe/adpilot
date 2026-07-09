@@ -69,11 +69,29 @@ export async function createUser(
     email: data.email.toLowerCase().trim(),
     passwordHash: data.passwordHash,
     fullName: data.fullName.trim(),
+    birthdate: null,
+    billingJson: null,
     createdAt: new Date().toISOString(),
   };
   store.users.set(user.id, user);
   persist();
   return user;
+}
+
+export async function updateUser(
+  id: string,
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson">>
+): Promise<User | null> {
+  const user = store.users.get(id);
+  if (!user) return null;
+  const updated: User = {
+    ...user,
+    ...patch,
+    email: patch.email ? patch.email.toLowerCase().trim() : user.email,
+  };
+  store.users.set(id, updated);
+  persist();
+  return updated;
 }
 
 export async function findUserByEmail(email: string): Promise<User | null> {

@@ -31,11 +31,21 @@ export interface CampaignPlan {
   estMonthlyReach: [number, number];
 }
 
+export interface BillingInfo {
+  nameOnCard: string;
+  cardLast4: string;
+  expMonth: number;
+  expYear: number;
+  billingZip: string;
+}
+
 export interface User {
   id: string;
   email: string;
   passwordHash: string;
   fullName: string;
+  birthdate: string | null; // yyyy-mm-dd
+  billingJson: BillingInfo | null;
   createdAt: string;
 }
 
@@ -49,6 +59,9 @@ export interface Business {
   createdAt: string;
 }
 
+/** Percentage of budget per platform; always sums to 100. */
+export type PlatformSplit = Record<Platform, number>;
+
 export interface Campaign {
   id: string;
   userId: string;
@@ -58,6 +71,11 @@ export interface Campaign {
   zip: string;
   durationMonths: number;
   continuous: boolean;
+  /** true when the owner used Manual Mode instead of letting the agent decide */
+  manualMode: boolean;
+  platformSplit: PlatformSplit;
+  siteCategories: string[];
+  customSites: string[];
   industryText: string;
   targetingJson: Targeting;
   adCopyJson: AdCopy;

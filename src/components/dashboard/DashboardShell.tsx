@@ -9,17 +9,20 @@ import {
   LogOut,
   Megaphone,
   Plus,
+  Settings,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import ActiveCampaigns from "./ActiveCampaigns";
 import AnalyticsPanel from "./AnalyticsPanel";
+import AnalyticsView from "./AnalyticsView";
 import CampaignModal from "./CampaignModal";
 import HistoryTable from "./HistoryTable";
+import SettingsModal from "./SettingsModal";
 import Logo from "@/components/Logo";
 import { DRAFT_STORAGE_KEY } from "@/components/landing/HeroConfigurator";
-import { aggregateMetrics, metricsForCampaign } from "@/lib/metrics";
+import { metricsForCampaign } from "@/lib/metrics";
 import type { Business, Campaign, CampaignDraft, SafeUser } from "@/lib/types";
 
 type Tab = "campaigns" | "analytics" | "history";
@@ -52,6 +55,8 @@ export default function DashboardShell({
   const [tab, setTab] = useState<Tab>("campaigns");
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [draft, setDraft] = useState<CampaignDraft | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [analyticsCampaign, setAnalyticsCampaign] = useState<Campaign | null>(null);
 
   // add-business modal state
   const [bizModalOpen, setBizModalOpen] = useState(false);
@@ -80,10 +85,6 @@ export default function DashboardShell({
   const businessCampaigns = useMemo(
     () => campaigns.filter((c) => c.businessId === selectedBusiness?.id),
     [campaigns, selectedBusiness?.id]
-  );
-  const metrics = useMemo(
-    () => aggregateMetrics(businessCampaigns.map(metricsForCampaign)),
-    [businessCampaigns]
   );
 
   async function handleAddBusiness(e: React.FormEvent) {
@@ -149,6 +150,15 @@ export default function DashboardShell({
           </button>
 
           <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Settings"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:border-navy-300 hover:text-navy-900"
+            >
+              <Settings size={15} />
+              <span className="hidden sm:inline">Settings</span>
+            </button>
             <form action="/api/auth/logout" method="post">
               <button
                 type="submit"
@@ -211,9 +221,15 @@ export default function DashboardShell({
 
         <div className="mt-6">
           {tab === "campaigns" && (
-            <ActiveCampaigns campaigns={businessCampaigns} onCreate={() => setCampaignModalOpen(true)} />
+            <ActiveCampaigns
+              campaigns={businessCampaigns}
+              onCreate={() => setCampaignModalOpen(true)}
+              onViewAnalytics={setAnalyticsCampaign}
+            />
           )}
-          {tab === "analytics" && <AnalyticsPanel metrics={metrics} />}
+          {tab === "analytics" && (
+            <AnalyticsView key={selectedBusiness?.id} campaigns={businessCampaigns} />
+          )}
           {tab === "history" && <HistoryTable campaigns={businessCampaigns} />}
         </div>
       </main>
@@ -230,6 +246,34 @@ export default function DashboardShell({
           }}
           onLaunched={() => router.refresh()}
         />
+      )}
+
+      {settingsOpen && <SettingsModal user={user} onClose={() => setSettingsOpen(false)} />}
+
+      {analyticsCampaign && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-navy-950/60 p-4 backdrop-blur-sm sm:p-8">
+          <div className="mx-auto w-full max-w-4xl rounded-2xl bg-slate-50 shadow-lift">
+            <div className="flex items-start justify-between rounded-t-2xl border-b border-slate-200 bg-white px-6 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-navy-900">Campaign analytics</h2>
+                <p className="text-sm text-slate-500">
+                  {analyticsCampaign.name} — this ad buy only
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAnalyticsCampaign(null)}
+                aria-label="Close analytics"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-900"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 sm:p-6">
+              <AnalyticsPanel metrics={metricsForCampaign(analyticsCampaign)} />
+            </div>
+          </div>
+        </div>
       )}
 
       {bizModalOpen && (
