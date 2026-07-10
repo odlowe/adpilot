@@ -76,6 +76,20 @@ export default function SettingsModal({
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // email verification
+  const [verifyState, setVerifyState] = useState<"idle" | "sending" | "sent">("idle");
+
+  async function sendVerification() {
+    if (verifyState !== "idle") return;
+    setVerifyState("sending");
+    try {
+      await fetch("/api/auth/verify/resend", { method: "POST" });
+      setVerifyState("sent");
+    } catch {
+      setVerifyState("idle");
+    }
+  }
+
   // password reset via email
   const [resetSending, setResetSending] = useState(false);
   const [resetNotice, setResetNotice] = useState<string | null>(null);
@@ -220,6 +234,35 @@ export default function SettingsModal({
                 <SaveRow saving={saving} message={message} />
               </form>
 
+              {/* email verification */}
+              <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
+                  <Mail size={15} className="text-emerald-600" />
+                  Email verification
+                </p>
+                {user.emailVerified ? (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-emerald-700">
+                    <CheckCircle2 size={14} /> {user.email} is verified.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-1.5 text-sm text-slate-600">
+                      <span className="font-semibold">{user.email}</span> isn&apos;t verified yet.
+                      Verifying protects your account and unlocks password changes.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={verifyState !== "idle"}
+                      onClick={() => void sendVerification()}
+                      className="mt-3 flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700 disabled:opacity-60"
+                    >
+                      {verifyState === "sending" && <Loader2 size={14} className="animate-spin" />}
+                      {verifyState === "sent" ? "Sent — check your inbox" : "Send verification email"}
+                    </button>
+                  </>
+                )}
+              </div>
+
               {/* password reset */}
               <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-5">
                 <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
@@ -227,12 +270,14 @@ export default function SettingsModal({
                   Change password
                 </p>
                 <p className="mt-1.5 text-sm text-slate-600">
-                  For security, password changes go through your email — we&apos;ll send a
-                  confirmation link to <span className="font-semibold">{user.email}</span>.
+                  {user.emailVerified
+                    ? <>For security, password changes go through your email — we&apos;ll send a confirmation link to <span className="font-semibold">{user.email}</span>.</>
+                    : "Verify your email above first — password changes are locked until we know this inbox is really yours."}
                 </p>
                 <button
                   type="button"
-                  disabled={resetSending}
+                  disabled={resetSending || !user.emailVerified}
+                  title={user.emailVerified ? undefined : "Verify your email first"}
                   onClick={sendResetEmail}
                   className="mt-3 flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700 disabled:opacity-60"
                 >

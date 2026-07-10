@@ -38,6 +38,8 @@ export async function generateAdImage(options: {
   businessName?: string;
   businessCategory?: string;
   businessDescription?: string;
+  /** Plain-English target-customer description — drives audience-tailored aesthetics. */
+  targetAudience?: string;
   references: ReferenceImage[];
   /** e.g. "16:9" — must be one Gemini supports. */
   aspectRatio?: string;
@@ -53,6 +55,7 @@ export async function generateAdImage(options: {
     businessName,
     businessCategory,
     businessDescription,
+    targetAudience,
     references,
     aspectRatio,
     placement,
@@ -72,26 +75,26 @@ export async function generateAdImage(options: {
     .join(" ");
 
   const instruction = [
-    "You are an elite advertising creative director and graphic designer producing ONE finished, scroll-stopping digital DISPLAY AD for a local small business. It must read instantly as a professionally DESIGNED advertisement — a deliberate layout of imagery and type — never a plain mood photo with words floating on it.",
+    "You are an elite advertising creative director. Produce ONE finished, professional digital DISPLAY AD — a deliberate, high-end graphic-design layout, never a plain photo with words floating on it. Process the inputs below through three strict filters: Visual & Layout Rules, the Input Translation Matrix, and Ad Network Standards.",
     `THE BUSINESS: ${businessLine}.`,
+    targetAudience ? `THE TARGET AUDIENCE: ${targetAudience.slice(0, 300)}.` : "",
     `THE OWNER'S CREATIVE REQUEST: "${prompt}"`,
     placement ? `PLACEMENT: this exact ad runs as ${placement}.` : "",
-    formatStyle ? `COMPOSITION FOR THIS PLACEMENT: ${formatStyle}.` : "",
-    "THE PRODUCT IS THE HERO — never an afterthought. Show the product or service moment IN USE: human hands opening, pouring, holding, serving, or wearing it, with crisp macro-level detail of texture and quality. Not a product sitting untouched on a counter. Three-second rule: a viewer must grasp what is being sold at a single glance — one strong subject, zero clutter.",
-    "COLOR DISCIPLINE (60-30-10 rule, non-negotiable): choose ONE cohesive palette and commit to it across the entire ad — roughly 60% a dominant background/environment tone, 30% a secondary tone carried by the product and subject, 10% a single high-contrast accent used ONLY for the call-to-action element. Never mix clashing hues or let colors drift between areas of the frame.",
+    formatStyle ? `LAYOUT RULE FOR THIS FORMAT: ${formatStyle}.` : "",
+    "FILTER 1 — UNIVERSAL VISUAL & LAYOUT RULES: Text and the main subject NEVER overlap — imagery lives in its zone, type lives in its own solid/minimalist/soft-focused zone. ZERO TEXT EFFECTS: absolute ban on strokes, outlines, outer glows, boxes, and harsh drop shadows; contrast comes purely from clean typographic color choice against a simple background. FONT PAIRING PROTOCOL: exactly TWO fonts — one bold, character-rich display font for the headline that matches the brand's vibe, one highly legible minimalist sans-serif for the subline and CTA. Professional editorial composition with ample negative space. Perfect spelling, straight baselines.",
+    "FILTER 2 — TRANSLATE THE INPUTS: First classify the business: Premium/Luxury → deep muted palette, massive negative space, elegant restrained type, hyper-minimalist layout. Casual/Local → warm vibrant high-key photography, friendly approachable type. B2B/Corporate → clean high-contrast blues/slates/whites, benefit-first tone, sharp geometric type. Then read the audience: older/professional → sophisticated imagery, LARGER highly legible type, direct value proposition. Younger → editorial, candid lifestyle photography (a beautiful social post, not a studio setup), subtle clever tone. Then the goal: aspirational request → grand spacious imagery, the headline sells a feeling or status. Problem-solving request → the image clearly shows the product solving the problem IN USE, human hands interacting with it, crisp macro detail.",
+    "THE PRODUCT IS THE HERO of the visual zone: shown in use, immediately understandable at a glance — a viewer must grasp what is being sold within three seconds. One strong subject, zero clutter.",
     references.length > 0
-      ? "BRAND MATCHING: derive the palette directly from the attached brand images — the ad must look like it belongs to the same family as the logo and photos. Stay faithful to how the real business, products, and people actually look."
-      : "PALETTE MOOD: pick the psychology that fits this business — urgency/deals: saturated warm accents on dark grounds; premium: deep navy, emerald, matte black, soft metallics; wellness/eco/trust/food: sage, warm cream, soft terracotta, earth tones.",
-    "LIGHTING: high-key, soft, diffused light for everyday and lifestyle businesses (clean, welcoming, accessible). Low-key moody contrast is reserved ONLY for explicitly premium/luxury positioning.",
-    "TYPOGRAPHY: bold, highly legible geometric sans-serif type in the family of Inter, Montserrat, or Futura — never script, never serif, never novelty fonts, never warped or hand-drawn lettering. If the logo has distinctive lettering, echo its character. ALL text combined occupies UNDER 20% of the frame. Perfect kerning, perfect spelling, straight baselines.",
+      ? "BRAND MATCHING: derive the entire palette and the display font's character from the attached brand images — the ad must look like it belongs to the same family as the logo and photos. Stay faithful to how the real business, products, and people actually look."
+      : "COLOR DISCIPLINE (60-30-10): 60% dominant background tone native to the brand's identity, 30% secondary tone on the product/subject, 10% one high-contrast accent reserved for the CTA. One cohesive palette, committed to across the whole frame — never clashing hues.",
     businessName
-      ? `TEXT LAYERS (exactly three, nothing more): (1) the business name "${businessName}" — large, bold, fully inside the frame, perfectly legible at thumbnail size, set against clean negative space or a subtle scrim, never only on a background object like a distant sign; (2) ONE short supporting line, 3-6 words drawn from the owner's request; (3) a small call-to-action chip/button in the 10% accent color with 2-3 words like "Visit us" or "Order now".`
+      ? `TEXT LAYERS (exactly three, nothing more, together under 20% of the canvas): (1) headline featuring the business name "${businessName}" — bold, fully in frame, legible at thumbnail size, in its own text zone; (2) ONE short subline, 3-6 words drawn from the owner's request, in the sans-serif; (3) THE CTA FOOTER: a small, clean, high-contrast zone at the very bottom of the layout with a short actionable line or minimalist button outline (2-3 words like "Visit us" or "Order now") in the accent color — never cluttered.`
       : "TEXT: none — no lettering at all.",
     logoAttached
-      ? "LOGO: the FIRST attached reference image is the business's actual logo. Reproduce it faithfully — exact colors, exact shapes, never distorted, cropped, redrawn, or blended into background objects — placed clearly (near a corner or on the product/packaging in frame) so the brand registers immediately."
+      ? "LOGO: the FIRST attached reference image is the business's actual logo. Reproduce it faithfully — exact colors and shapes, never distorted, cropped, redrawn, or blended into background objects — subtly but clearly present (small corner placement or on packaging in frame) so the brand registers immediately."
       : "",
-    "IMAGE QUALITY: photorealistic, professional commercial-photography grade — crisp focus on the hero, shallow depth of field, rich but controlled color. Modern and thumb-stopping.",
-    "NEVER include: watermarks, other brands' logos or trademarks, fake awards or press badges, gibberish or lorem-ipsum text, extra stray words beyond the three text layers.",
+    "FILTER 3 — AD NETWORK STANDARDS: text occupies at most 20% of the canvas. The layout must be clean, scannable, and ready for Meta/Google/LinkedIn deployment. IMAGE QUALITY: photorealistic, professional commercial-photography grade — crisp focus on the hero, controlled color, lighting matched to the brand tier (high-key diffused for everyday businesses; low-key moody ONLY for explicit luxury).",
+    "NEVER include: watermarks, other brands' logos or trademarks, fake awards or press badges, gibberish text, or any words beyond the three text layers.",
   ]
     .filter(Boolean)
     .join(" ");

@@ -52,6 +52,7 @@ export async function POST(request: Request) {
         businessId?: string;
         businessName?: string;
         format?: string;
+        audience?: string;
         references?: ReferenceImage[];
       }
     | null;
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
         businessName,
         businessCategory,
         businessDescription,
+        targetAudience: typeof body?.audience === "string" ? body.audience.trim() || undefined : undefined,
         references: [...brandingRefs, ...references].slice(0, 6),
         aspectRatio: formatDef.ratio,
         placement: formatDef.placement,

@@ -230,6 +230,20 @@ phone/website (now applied via businessPatchFrom).
   live in Workbench (Developers button, bottom-left) → Webhooks →
   Create new destination.
 
+## Jul 10 (final) — briefing v5 + settings verification
+
+- Briefing v5 (imagegen.ts): Owen's three-filter framework encoded — Filter 1
+  layout laws (left/right split 16:9+1:1+banner, upper/lower thirds 9:16 with
+  10%/15% UI safe zones, text/subject never overlap, zero text FX, exactly two
+  fonts: display + sans), Filter 2 translation matrix (premium/casual/B2B ×
+  audience age × aspirational-vs-problem-solving), Filter 3 network standards
+  (≤20% text, CTA footer zone). Target-customer text (industryText/intentText)
+  now flows into /api/creative as `audience` and into the briefing.
+- Settings → Account: Email-verification card (status + send button) and the
+  password-reset button is DISABLED until verified. Enforcement design: a
+  consumed reset link auto-verifies (possession of inbox proven) — airtight
+  without locking out password recovery.
+
 ## Working conventions with Owen
 
 - Batch requests arrive as long run-on lists — restate as a task list, build

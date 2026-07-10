@@ -21,7 +21,7 @@ export const CREATIVE_FORMATS: Array<{
     ratio: "21:9",
     placement: "a wide banner strip across the top of a webpage",
     style:
-      "slim horizontal layout — product hero moment on one side, business name and CTA in the clean space on the other, generous breathing room, nothing cramped",
+      "LEFT/RIGHT SPLIT: primary visual on one side, the opposite side a solid or soft-focused text zone — they never overlap; generous breathing room across the slim strip",
   },
   {
     key: "landscape",
@@ -29,7 +29,7 @@ export const CREATIVE_FORMATS: Array<{
     ratio: "16:9",
     placement: "an in-feed or page-break ad on a website",
     style:
-      "editorial feed layout — the product-in-use moment dominates, with one clearly separated text zone; high contrast against a typical webpage background",
+      "LEFT/RIGHT SPLIT: the product-in-use moment fills one side of the frame; the opposite side is a solid, minimalist, or soft-focused text zone — imagery and text never overlap",
   },
   {
     key: "square",
@@ -37,7 +37,7 @@ export const CREATIVE_FORMATS: Array<{
     ratio: "1:1",
     placement: "a pop-up or square social ad",
     style:
-      "tightly framed, high-contrast thumb-stopper with centered visual hierarchy — built to interrupt a rapid scroll with instant clarity",
+      "centered or beautifully split composition, high-contrast and tightly framed for a fast mobile feed — text lives in its own clean zone, never on top of the subject",
   },
   {
     key: "vertical",
@@ -45,7 +45,7 @@ export const CREATIVE_FORMATS: Array<{
     ratio: "9:16",
     placement: "a tall story-format or sidebar ad",
     style:
-      "native phone-story energy — authentic, casual, almost user-generated feel; subject fills the frame; text styled like clean native story overlays, not a corporate poster",
+      "UPPER/LOWER THIRDS: anchor the main subject in the lower two-thirds; the top third stays a clean, uncluttered canvas for the typography. Keep ALL critical text and logos out of the top 10% and bottom 15% of the frame (platform UI covers those). Candid, high-quality lifestyle energy — like a great social post, not a studio poster",
   },
 ];
 

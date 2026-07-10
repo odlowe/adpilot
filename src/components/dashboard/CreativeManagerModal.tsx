@@ -93,6 +93,7 @@ export default function CreativeManagerModal({
           prompt: target.prompt ?? campaign.industryText,
           businessId: campaign.businessId,
           format: target.format,
+          audience: campaign.industryText,
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
@@ -122,6 +123,7 @@ export default function CreativeManagerModal({
           prompt: genPrompt.trim(),
           businessId: campaign.businessId,
           format: genFormat,
+          audience: campaign.industryText,
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string };

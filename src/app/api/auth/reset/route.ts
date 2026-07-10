@@ -26,7 +26,11 @@ export async function POST(request: Request) {
     );
   }
 
-  await updateUser(userId, { passwordHash: hashPassword(password) });
+  // Clicking a link that only their inbox received proves they own the
+  // email — so a successful reset also counts as verification. This is what
+  // makes "verified email required to change password" airtight without
+  // ever locking a genuinely forgetful user out of their account.
+  await updateUser(userId, { passwordHash: hashPassword(password), emailVerified: true });
   createSession(userId);
   return NextResponse.json({ ok: true });
 }

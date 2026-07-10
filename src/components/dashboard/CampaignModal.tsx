@@ -142,6 +142,7 @@ export default function CampaignModal({
               businessId,
               businessName,
               format,
+              audience: intentText.trim() || undefined,
               references: aiRefs.map(({ mimeType, data }) => ({ mimeType, data })),
             }),
           });
