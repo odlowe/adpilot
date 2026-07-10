@@ -17,6 +17,7 @@ import { useState } from "react";
 import CampaignPreview from "./CampaignPreview";
 import CreativeUploader from "./CreativeUploader";
 import Slider from "@/components/ui/Slider";
+import { readError } from "@/lib/client";
 import type { CampaignDraft, CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
 
 export const SITE_CATEGORIES = [
@@ -116,16 +117,21 @@ export default function CampaignModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ intentText, budget, radiusMiles: radius, businessId }),
       });
-      const data = (await res.json()) as { plan?: CampaignPlan; error?: string };
-      if (!res.ok || !data.plan) {
-        setError(data.error ?? "Something went wrong. Please try again.");
+      if (!res.ok) {
+        setError(await readError(res));
+        setPhase("editing");
+        return;
+      }
+      const data = (await res.json()) as { plan?: CampaignPlan };
+      if (!data.plan) {
+        setError("Something went wrong. Please try again.");
         setPhase("editing");
         return;
       }
       setPlan(data.plan);
       setPhase("preview");
     } catch {
-      setError("Couldn't reach the server. Please try again.");
+      setError("No connection — check your internet and try again.");
       setPhase("editing");
     }
   }
@@ -154,15 +160,14 @@ export default function CampaignModal({
         }),
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? "Launch failed. Please try again.");
+        setError(await readError(res));
         setPhase("preview");
         return;
       }
       setPhase("launched");
       onLaunched();
     } catch {
-      setError("Couldn't reach the server. Please try again.");
+      setError("No connection — check your internet and try again.");
       setPhase("preview");
     }
   }

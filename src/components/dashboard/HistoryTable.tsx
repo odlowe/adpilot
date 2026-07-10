@@ -3,6 +3,7 @@
 import { Archive, BarChart3, Check, Loader2, Pencil, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { readError } from "@/lib/client";
 import { metricsForCampaign, outcomeSummary } from "@/lib/metrics";
 import type { Campaign } from "@/lib/types";
 
@@ -26,6 +27,7 @@ export default function HistoryTable({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function startRename(campaign: Campaign) {
     setRenamingId(campaign.id);
@@ -39,16 +41,23 @@ export default function HistoryTable({
       return;
     }
     setSavingRename(true);
+    setError(null);
     try {
-      await fetch(`/api/campaigns/${campaign.id}`, {
+      const res = await fetch(`/api/campaigns/${campaign.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ updates: { name } }),
       });
+      if (!res.ok) {
+        setError(await readError(res));
+        return;
+      }
       router.refresh();
+      setRenamingId(null);
+    } catch {
+      setError("No connection — check your internet and try again.");
     } finally {
       setSavingRename(false);
-      setRenamingId(null);
     }
   }
 
@@ -65,6 +74,12 @@ export default function HistoryTable({
   }
 
   return (
+    <div className="space-y-3">
+    {error && (
+      <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+        {error}
+      </p>
+    )}
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
@@ -164,6 +179,7 @@ export default function HistoryTable({
           </tbody>
         </table>
       </div>
+    </div>
     </div>
   );
 }

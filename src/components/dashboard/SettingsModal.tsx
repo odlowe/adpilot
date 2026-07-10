@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { readError } from "@/lib/client";
 import type { DigestFrequency, SafeUser } from "@/lib/types";
 
 type Tab = "account" | "billing" | "email" | "appearance";
@@ -110,15 +111,14 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setMessage({ ok: false, text: data.error ?? "Something went wrong." });
+        setMessage({ ok: false, text: await readError(res) });
       } else {
         setMessage({ ok: true, text: "Saved!" });
         router.refresh();
       }
     } catch {
-      setMessage({ ok: false, text: "Couldn't reach the server." });
+      setMessage({ ok: false, text: "No connection — check your internet and try again." });
     } finally {
       setSaving(false);
     }

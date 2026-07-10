@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { useState } from "react";
+import { readError } from "@/lib/client";
 import type { Business } from "@/lib/types";
 
 const CATEGORIES = [
@@ -44,14 +45,18 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, category, description, address, phone, website }),
       });
-      const data = (await res.json()) as { business?: Business; error?: string };
-      if (!res.ok || !data.business) {
-        setError(data.error ?? "Something went wrong.");
+      if (!res.ok) {
+        setError(await readError(res));
+        return;
+      }
+      const data = (await res.json()) as { business?: Business };
+      if (!data.business) {
+        setError("Something went wrong.");
         return;
       }
       onSaved(data.business.id);
     } catch {
-      setError("Couldn't reach the server.");
+      setError("No connection — check your internet and try again.");
     } finally {
       setSaving(false);
     }
@@ -66,15 +71,14 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
     setError(null);
     try {
       const res = await fetch(`/api/businesses/${business.id}`, { method: "DELETE" });
-      const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError(data.error ?? "Deletion failed.");
+        setError(await readError(res));
         setDeleting(false);
         return;
       }
       onSaved(null);
     } catch {
-      setError("Couldn't reach the server.");
+      setError("No connection — check your internet and try again.");
       setDeleting(false);
     }
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createCampaign, getBusinessById, listCampaignsByUser } from "@/lib/db";
+import { sendCampaignReceiptEmail } from "@/lib/email";
 import type { CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
 
 /** Normalize any three numbers into whole percentages summing to 100. */
@@ -85,6 +86,24 @@ export async function POST(request: Request) {
     endDate: null,
     isSample: false,
   });
+
+  // Confirmation + receipt. Never let an email hiccup break the launch itself.
+  try {
+    await sendCampaignReceiptEmail({
+      to: user.email,
+      ownerName: user.fullName,
+      businessName: business.name,
+      campaignName: campaign.name,
+      budget: campaign.budget,
+      durationMonths: campaign.durationMonths,
+      continuous: campaign.continuous,
+      radiusMiles: campaign.targetingJson.radiusMiles,
+      zip: campaign.zip,
+      startDate: campaign.startDate,
+    });
+  } catch {
+    // Email failed — the campaign is still launched; digests will catch them up.
+  }
 
   return NextResponse.json({ campaign }, { status: 201 });
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SITE_CATEGORIES } from "./CampaignModal";
 import Slider from "@/components/ui/Slider";
+import { readError } from "@/lib/client";
 import type { Campaign, Platform, PlatformSplit } from "@/lib/types";
 
 const money = (n: number) =>
@@ -110,15 +111,14 @@ export default function EditCampaignModal({
           },
         }),
       });
-      const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong.");
+        setError(await readError(res));
         return;
       }
       router.refresh();
       onClose();
     } catch {
-      setError("Couldn't reach the server.");
+      setError("No connection — check your internet and try again. Your changes weren't lost; just hit Save again.");
     } finally {
       setSaving(false);
     }

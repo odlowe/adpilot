@@ -4,6 +4,7 @@ import { Loader2, Lock, Mail, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { readError } from "@/lib/client";
 
 interface AuthFormProps {
   mode: "signup" | "login";
@@ -50,9 +51,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(mode === "signup" ? { fullName, email, password } : { email, password }),
       });
-      const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong. Please try again.");
+        setError(await readError(res));
         setSubmitting(false);
         return;
       }
@@ -60,7 +60,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       router.push(mode === "signup" ? "/onboarding" : next || "/dashboard");
       router.refresh();
     } catch {
-      setError("Couldn't reach the server. Please try again.");
+      setError("No connection — check your internet and try again.");
       setSubmitting(false);
     }
   }

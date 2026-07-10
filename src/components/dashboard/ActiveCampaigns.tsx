@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Check,
   Loader2,
   MapPin,
   Pause,
@@ -12,10 +13,12 @@ import {
   Rocket,
   SlidersHorizontal,
   Square,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { budgetProgress } from "@/lib/metrics";
+import { readError } from "@/lib/client";
 import type { Campaign, Platform, PlatformStatus } from "@/lib/types";
 
 const money = (n: number) =>
@@ -54,6 +57,13 @@ export default function ActiveCampaigns({
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // inline rename state — the pencil only changes the name, nothing else
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [savingRename, setSavingRename] = useState(false);
+
   const active = campaigns.filter((c) => c.status === "active" || c.status === "paused");
 
   async function control(campaign: Campaign, action: "pause" | "resume" | "end") {
@@ -61,20 +71,64 @@ export default function ActiveCampaigns({
       return;
     }
     setBusyId(campaign.id);
+    setError(null);
     try {
-      await fetch(`/api/campaigns/${campaign.id}`, {
+      const res = await fetch(`/api/campaigns/${campaign.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
+      if (!res.ok) {
+        setError(await readError(res));
+        return;
+      }
       router.refresh();
+    } catch {
+      setError("No connection — check your internet and try again.");
     } finally {
       setBusyId(null);
     }
   }
 
+  function startRename(campaign: Campaign) {
+    setRenamingId(campaign.id);
+    setRenameValue(campaign.name);
+  }
+
+  async function saveRename(campaign: Campaign) {
+    const name = renameValue.trim();
+    if (name.length < 2 || name === campaign.name) {
+      setRenamingId(null);
+      return;
+    }
+    setSavingRename(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates: { name } }),
+      });
+      if (!res.ok) {
+        setError(await readError(res));
+        return;
+      }
+      router.refresh();
+      setRenamingId(null);
+    } catch {
+      setError("No connection — check your internet and try again.");
+    } finally {
+      setSavingRename(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {error && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+          {error}
+        </p>
+      )}
       {active.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <Rocket size={26} className="mx-auto text-slate-300" />
@@ -94,6 +148,7 @@ export default function ActiveCampaigns({
           {active.map((campaign) => {
             const progress = budgetProgress(campaign);
             const delivered = Math.round(campaign.budget * progress);
+            const renaming = renamingId === campaign.id;
             return (
               <div key={campaign.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -118,27 +173,65 @@ export default function ActiveCampaigns({
                         />
                       ))}
                   <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 font-bold leading-snug text-navy-900">
-                      {campaign.name}
-                      <button
-                        type="button"
-                        onClick={() => onEdit(campaign)}
-                        aria-label={`Edit ${campaign.name}`}
-                        className="rounded-md p-1 text-slate-300 transition hover:bg-slate-100 hover:text-navy-900"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      {campaign.isSample && (
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">
-                          Sample
-                        </span>
-                      )}
-                      {campaign.status === "paused" && (
-                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">
-                          Paused
-                        </span>
-                      )}
-                    </p>
+                    {renaming ? (
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void saveRename(campaign);
+                            }
+                            if (e.key === "Escape") setRenamingId(null);
+                          }}
+                          className="w-full max-w-[260px] rounded-lg border border-emerald-400 px-2.5 py-1.5 text-sm font-bold text-navy-900 outline-none ring-4 ring-emerald-100"
+                          aria-label="New campaign name"
+                        />
+                        <button
+                          type="button"
+                          disabled={savingRename}
+                          onClick={() => void saveRename(campaign)}
+                          aria-label="Save name"
+                          className="rounded-md p-1.5 text-emerald-600 transition hover:bg-emerald-50"
+                        >
+                          {savingRename ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRenamingId(null)}
+                          aria-label="Cancel rename"
+                          className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ) : (
+                      <p className="flex flex-wrap items-center gap-2 font-bold leading-snug text-navy-900">
+                        {campaign.name}
+                        <button
+                          type="button"
+                          onClick={() => startRename(campaign)}
+                          aria-label={`Rename ${campaign.name}`}
+                          title="Rename"
+                          className="rounded-md p-1 text-slate-300 transition hover:bg-slate-100 hover:text-navy-900"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        {campaign.isSample && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">
+                            Sample
+                          </span>
+                        )}
+                        {campaign.status === "paused" && (
+                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">
+                            Paused
+                          </span>
+                        )}
+                      </p>
+                    )}
                     <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
                       <span className="font-semibold text-emerald-700">{money(campaign.budget)}/month</span>
                       <span className="flex items-center gap-1">
@@ -212,6 +305,15 @@ export default function ActiveCampaigns({
                         Pause
                       </button>
                     )}
+                    <button
+                      type="button"
+                      disabled={busyId === campaign.id}
+                      onClick={() => onEdit(campaign)}
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-navy-400 hover:text-navy-900 disabled:opacity-60"
+                    >
+                      <SlidersHorizontal size={13} />
+                      Edit campaign
+                    </button>
                     <button
                       type="button"
                       disabled={busyId === campaign.id}
