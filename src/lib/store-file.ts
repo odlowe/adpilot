@@ -246,7 +246,9 @@ export async function updateCampaign(
       | "platformSplit"
       | "siteCategories"
       | "customSites"
+      | "industryText"
       | "targetingJson"
+      | "adCopyJson"
       | "creativeUrl"
       | "creativesJson"
     >

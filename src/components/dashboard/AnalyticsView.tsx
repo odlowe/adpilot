@@ -3,7 +3,8 @@
 import { CheckSquare, Filter, Search, Square, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import AnalyticsPanel from "./AnalyticsPanel";
-import { aggregateMetrics, metricsForCampaign } from "@/lib/metrics";
+import TimeframePicker from "./TimeframePicker";
+import { aggregateMetrics, metricsForCampaign, windowDaysFor, type Timeframe } from "@/lib/metrics";
 import type { Campaign, CampaignStatus } from "@/lib/types";
 
 type StatusFilter = "all" | CampaignStatus;
@@ -26,6 +27,7 @@ export default function AnalyticsView({ campaigns }: { campaigns: Campaign[] }) 
   );
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [timeframe, setTimeframe] = useState<Timeframe>("all");
 
   // Campaigns matching the search + filter — the only ones shown and counted.
   const visible = useMemo(() => {
@@ -39,9 +41,12 @@ export default function AnalyticsView({ campaigns }: { campaigns: Campaign[] }) 
 
   const selected = visible.filter((c) => selectedIds.has(c.id));
   const metrics = useMemo(
-    () => aggregateMetrics(selected.map(metricsForCampaign)),
+    () => {
+      const windowDays = windowDaysFor(selected, timeframe);
+      return aggregateMetrics(selected.map((c) => metricsForCampaign(c, windowDays)));
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedIds, visible]
+    [selectedIds, visible, timeframe]
   );
 
   function toggle(id: string) {
@@ -184,7 +189,12 @@ export default function AnalyticsView({ campaigns }: { campaigns: Campaign[] }) 
           </p>
         </div>
       ) : (
-        <AnalyticsPanel metrics={metrics} />
+        <>
+          <div className="flex justify-end">
+            <TimeframePicker value={timeframe} onChange={setTimeframe} />
+          </div>
+          <AnalyticsPanel metrics={metrics} />
+        </>
       )}
     </div>
   );

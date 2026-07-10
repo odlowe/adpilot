@@ -42,7 +42,7 @@ export default function PerformanceChart({ series }: { series: DayPoint[] }) {
         viewBox={`0 0 ${W} ${H}`}
         className="mt-3 w-full"
         role="img"
-        aria-label="Daily views and clicks over the last 30 days"
+        aria-label="Daily views and clicks over the selected timeframe"
       >
         {/* gridlines */}
         {[0.25, 0.5, 0.75, 1].map((f) => (
@@ -91,7 +91,7 @@ export default function PerformanceChart({ series }: { series: DayPoint[] }) {
 
         {/* x labels (weekly) */}
         {series.map((d, i) =>
-          i % 7 === 3 ? (
+          i % Math.max(7, Math.ceil(n / 6)) === Math.floor(Math.max(7, Math.ceil(n / 6)) / 2) ? (
             <text key={d.date} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#94a3b8">
               {d.label}
             </text>

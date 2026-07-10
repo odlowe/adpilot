@@ -23,12 +23,13 @@ import BusinessModal from "./BusinessModal";
 import CampaignModal from "./CampaignModal";
 import CreativeManagerModal from "./CreativeManagerModal";
 import EditCampaignModal from "./EditCampaignModal";
+import TimeframePicker from "./TimeframePicker";
 import HistoryTable from "./HistoryTable";
 import SettingsModal from "./SettingsModal";
 import Footer from "@/components/landing/Footer";
 import Logo from "@/components/Logo";
 import { DRAFT_STORAGE_KEY } from "@/components/landing/HeroConfigurator";
-import { metricsForCampaign } from "@/lib/metrics";
+import { metricsForCampaign, windowDaysFor, type Timeframe } from "@/lib/metrics";
 import type { Business, Campaign, CampaignDraft, SafeUser } from "@/lib/types";
 
 type Tab = "campaigns" | "analytics" | "history";
@@ -55,6 +56,7 @@ export default function DashboardShell({
   const [draft, setDraft] = useState<CampaignDraft | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analyticsCampaign, setAnalyticsCampaign] = useState<Campaign | null>(null);
+  const [analyticsTimeframe, setAnalyticsTimeframe] = useState<Timeframe>("all");
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
   const [creativesFor, setCreativesFor] = useState<Campaign | null>(null);
   /** Campaign waiting on the "editing pauses your ads" confirmation. */
@@ -267,7 +269,7 @@ export default function DashboardShell({
             <AnalyticsView key={selectedBusiness?.id} campaigns={businessCampaigns} />
           )}
           {tab === "history" && (
-            <HistoryTable campaigns={businessCampaigns} onViewAnalytics={setAnalyticsCampaign} />
+            <HistoryTable campaigns={businessCampaigns} onViewAnalytics={setAnalyticsCampaign} onManageCreatives={setCreativesFor} />
           )}
         </div>
       </main>
@@ -296,6 +298,10 @@ export default function DashboardShell({
             setSettingsOpen(false);
             setBizModal(b);
           }}
+          onAddBusiness={() => {
+            setSettingsOpen(false);
+            setBizModal("create");
+          }}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -320,7 +326,15 @@ export default function DashboardShell({
               </button>
             </div>
             <div className="p-5 sm:p-6">
-              <AnalyticsPanel metrics={metricsForCampaign(analyticsCampaign)} />
+              <div className="mb-4 flex justify-end">
+                <TimeframePicker value={analyticsTimeframe} onChange={setAnalyticsTimeframe} />
+              </div>
+              <AnalyticsPanel
+                metrics={metricsForCampaign(
+                  analyticsCampaign,
+                  windowDaysFor([analyticsCampaign], analyticsTimeframe)
+                )}
+              />
             </div>
           </div>
         </div>
@@ -367,18 +381,22 @@ export default function DashboardShell({
       )}
 
       {creativesFor && (
-        <CreativeManagerModal campaign={creativesFor} onClose={() => setCreativesFor(null)} />
+        <CreativeManagerModal
+          campaign={creativesFor}
+          finishLabel={editCampaign ? "Save & back to campaign edits" : "Update campaign"}
+          onClose={() => setCreativesFor(null)}
+        />
       )}
+      {/* Kept mounted (hidden) while the image manager is open, so in-progress
+          campaign edits survive the round trip. */}
       {editCampaign && (
+        <div className={creativesFor ? "hidden" : ""}>
         <EditCampaignModal
           campaign={editCampaign}
-          onManageImages={() => {
-            const target = editCampaign;
-            void closeEdit();
-            setCreativesFor(target);
-          }}
+          onManageImages={() => setCreativesFor(editCampaign)}
           onClose={() => void closeEdit()}
         />
+        </div>
       )}
 
       {bizModal && (

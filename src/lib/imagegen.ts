@@ -109,7 +109,7 @@ export async function generateAdImage(options: {
         store: false,
         response_format: {
           type: "image",
-          mime_type: "image/png",
+          mime_type: "image/jpeg",
           aspect_ratio: aspectRatio && ALLOWED_RATIOS.has(aspectRatio) ? aspectRatio : "16:9",
         },
       }),

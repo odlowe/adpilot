@@ -369,7 +369,9 @@ export async function updateCampaign(
       | "platformSplit"
       | "siteCategories"
       | "customSites"
+      | "industryText"
       | "targetingJson"
+      | "adCopyJson"
       | "creativeUrl"
       | "creativesJson"
     >
@@ -387,7 +389,9 @@ export async function updateCampaign(
   if (patch.platformSplit !== undefined) rowPatch.platform_split = patch.platformSplit;
   if (patch.siteCategories !== undefined) rowPatch.site_categories = patch.siteCategories;
   if (patch.customSites !== undefined) rowPatch.custom_sites = patch.customSites;
+  if (patch.industryText !== undefined) rowPatch.industry_text = patch.industryText;
   if (patch.targetingJson !== undefined) rowPatch.targeting_json = patch.targetingJson;
+  if (patch.adCopyJson !== undefined) rowPatch.ad_copy_json = patch.adCopyJson;
 
   const { data: row, error } = await db()
     .from("campaigns")

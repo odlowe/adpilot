@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { generateCampaignPlan } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
-import { listCampaignsByUser, updateCampaign, updateCampaignStatus } from "@/lib/db";
+import { getBusinessById, listCampaignsByUser, updateCampaign, updateCampaignStatus } from "@/lib/db";
+
+// Editing the target customer re-runs the AI planner — allow model latency.
+export const maxDuration = 30;
 import { cleanCreatives } from "@/lib/creative-validate";
 import type { PlatformSplit } from "@/lib/types";
 
@@ -54,6 +58,7 @@ export async function PATCH(
         action?: keyof typeof ACTIONS;
         updates?: {
           name?: string;
+          industryText?: string;
           budget?: number;
           zip?: string;
           durationMonths?: number;
@@ -77,6 +82,9 @@ export async function PATCH(
       patch.budget = Math.min(5000, Math.max(250, Math.round(Number(body.updates.budget) || 0)));
     }
     if (typeof body.updates.zip === "string") patch.zip = body.updates.zip.trim().slice(0, 32);
+    if (typeof body.updates.industryText === "string" && body.updates.industryText.trim().length >= 12) {
+      patch.industryText = body.updates.industryText.trim().slice(0, 2000);
+    }
     if (body.updates.durationMonths !== undefined) {
       patch.durationMonths = Math.min(6, Math.max(1, Math.round(Number(body.updates.durationMonths) || 1)));
     }
@@ -112,16 +120,50 @@ export async function PATCH(
       body.updates.radiusMiles !== undefined
         ? Math.min(50, Math.max(1, Math.round(Number(body.updates.radiusMiles) || 1)))
         : undefined;
-    if (keywords !== undefined || radius !== undefined) {
+
+    if (keywords !== undefined || radius !== undefined || patch.industryText !== undefined) {
       const existing = (await listCampaignsByUser(user.id)).find((c) => c.id === params.id);
       if (!existing) {
         return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
       }
-      patch.targetingJson = {
-        ...existing.targetingJson,
-        ...(radius !== undefined ? { radiusMiles: radius } : {}),
-        ...(keywords !== undefined ? { googleKeywords: keywords } : {}),
-      };
+
+      const audienceChanged =
+        patch.industryText !== undefined && patch.industryText !== existing.industryText;
+      const radiusChanged =
+        radius !== undefined && radius !== existing.targetingJson.radiusMiles;
+      // Keywords the owner deliberately edited in this save win over the AI's.
+      const keywordsEdited =
+        keywords !== undefined &&
+        JSON.stringify(keywords) !== JSON.stringify(existing.targetingJson.googleKeywords);
+
+      if (audienceChanged || radiusChanged) {
+        // The edit changes who the ads are for — re-run the agent so the
+        // whole campaign (copy + targeting) follows, not just one field.
+        const effectiveIntent = (patch.industryText as string | undefined) ?? existing.industryText;
+        const effectiveRadius = radius ?? existing.targetingJson.radiusMiles;
+        const effectiveBudget = (patch.budget as number | undefined) ?? existing.budget;
+
+        let enriched = effectiveIntent;
+        const business = await getBusinessById(existing.businessId);
+        if (business && business.userId === user.id) {
+          const profileBits = [business.description, business.address].filter(Boolean).join(". ");
+          if (profileBits) enriched = `${enriched}. About the business: ${profileBits}`;
+        }
+
+        const plan = await generateCampaignPlan(enriched, effectiveBudget, effectiveRadius);
+        patch.adCopyJson = plan.adCopy;
+        patch.targetingJson = {
+          ...plan.targeting,
+          radiusMiles: effectiveRadius,
+          ...(keywordsEdited ? { googleKeywords: keywords } : {}),
+        };
+      } else if (keywords !== undefined || radius !== undefined) {
+        patch.targetingJson = {
+          ...existing.targetingJson,
+          ...(radius !== undefined ? { radiusMiles: radius } : {}),
+          ...(keywords !== undefined ? { googleKeywords: keywords } : {}),
+        };
+      }
     }
 
     const campaign = await updateCampaign(params.id, user.id, patch);

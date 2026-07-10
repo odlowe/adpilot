@@ -39,6 +39,7 @@ export default function EditCampaignModal({
         : [];
   const router = useRouter();
   const [name, setName] = useState(campaign.name);
+  const [industryText, setIndustryText] = useState(campaign.industryText);
   const [budget, setBudget] = useState(campaign.budget);
   const [zip, setZip] = useState(campaign.zip);
   const [duration, setDuration] = useState(campaign.durationMonths);
@@ -109,6 +110,7 @@ export default function EditCampaignModal({
         body: JSON.stringify({
           updates: {
             name,
+            industryText,
             budget,
             zip,
             durationMonths: duration,
@@ -187,6 +189,22 @@ export default function EditCampaignModal({
             <span className="font-bold text-navy-900">{money(budget + fee)}/month</span>
           </p>
         </div>
+
+        <label className="mt-5 block text-sm font-semibold text-navy-900" htmlFor="camp-audience">
+          Your target customer
+        </label>
+        <p className="mt-0.5 text-xs text-slate-400">
+          Plain English — change this (or the radius) and your agent rewrites the
+          campaign&apos;s ad copy and targeting to match when you save.
+        </p>
+        <textarea
+          id="camp-audience"
+          rows={3}
+          minLength={12}
+          value={industryText}
+          onChange={(e) => setIndustryText(e.target.value)}
+          className="mt-1.5 w-full resize-y rounded-xl border border-slate-300 px-4 py-2.5 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+        />
 
         <label className="mt-5 block text-sm font-semibold text-navy-900" htmlFor="camp-zip">
           ZIP code or address

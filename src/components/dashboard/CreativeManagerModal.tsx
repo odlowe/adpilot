@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, ImagePlus, Loader2, RefreshCw, Trash2, Wand2, X } from "lucide-react";
+import { Check, Download, ImagePlus, Loader2, RefreshCw, Trash2, Wand2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { CREATIVE_FORMATS, FORMAT_LABELS } from "@/lib/creative-formats";
@@ -9,14 +9,18 @@ import type { Campaign, CampaignCreative, CreativeFormat } from "@/lib/types";
 
 /**
  * The campaign's image library: every ad size in one place, with
- * remove / add / regenerate / download. Opens from the campaign card
- * thumbnail and from the Edit Campaign screen.
+ * remove / add / regenerate / download. Nothing touches the campaign until
+ * "Update campaign" is clicked — Cancel discards. Opens from the campaign
+ * card thumbnail and from the Edit Campaign screen.
  */
 export default function CreativeManagerModal({
   campaign,
+  finishLabel = "Update campaign",
   onClose,
 }: {
   campaign: Campaign;
+  /** Save-button label — changes when arriving from the Edit Campaign screen. */
+  finishLabel?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -30,6 +34,7 @@ export default function CreativeManagerModal({
         : [];
 
   const [creatives, setCreatives] = useState<CampaignCreative[]>(initial);
+  const [dirty, setDirty] = useState(false);
   const [busyIndex, setBusyIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,33 +45,39 @@ export default function CreativeManagerModal({
   const [genPrompt, setGenPrompt] = useState("");
   const [genFormat, setGenFormat] = useState<Exclude<CreativeFormat, "custom">>("landscape");
 
-  /** Persists the current set; the first image becomes the campaign thumbnail. */
-  async function persist(next: CampaignCreative[]): Promise<boolean> {
+  const anyBusy = saving || uploading || generating || busyIndex !== null;
+
+  function update(next: CampaignCreative[]) {
+    setCreatives(next);
+    setDirty(true);
+  }
+
+  /** The one write: saves the set; the first image becomes the thumbnail. */
+  async function save() {
     setSaving(true);
     setError(null);
     try {
       const res = await fetch(`/api/campaigns/${campaign.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates: { creatives: next } }),
+        body: JSON.stringify({ updates: { creatives } }),
       });
       if (!res.ok) {
         setError(await readError(res));
-        return false;
+        return;
       }
-      setCreatives(next);
       router.refresh();
-      return true;
+      onClose();
     } catch {
       setError("No connection — check your internet and try again.");
-      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove(index: number) {
-    await persist(creatives.filter((_, i) => i !== index));
+  function cancel() {
+    if (dirty && !window.confirm("Discard your image changes?")) return;
+    onClose();
   }
 
   async function regenerate(index: number) {
@@ -91,7 +102,7 @@ export default function CreativeManagerModal({
       }
       const next = [...creatives];
       next[index] = { ...target, url: data.url, createdAt: new Date().toISOString() };
-      await persist(next);
+      update(next);
     } catch {
       setError("No connection — check your internet and try again.");
     } finally {
@@ -118,13 +129,16 @@ export default function CreativeManagerModal({
         setError(data.error ?? "Couldn't generate — please try again.");
         return;
       }
-      const added: CampaignCreative = {
-        url: data.url,
-        format: genFormat,
-        prompt: genPrompt.trim(),
-        createdAt: new Date().toISOString(),
-      };
-      if (await persist([...creatives, added])) setGenPrompt("");
+      update([
+        ...creatives,
+        {
+          url: data.url,
+          format: genFormat,
+          prompt: genPrompt.trim(),
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setGenPrompt("");
     } catch {
       setError("No connection — check your internet and try again.");
     } finally {
@@ -149,7 +163,7 @@ export default function CreativeManagerModal({
           setError(data.error ?? "One of the uploads failed.");
         }
       }
-      if (added.length > 0) await persist([...creatives, ...added]);
+      if (added.length > 0) update([...creatives, ...added]);
     } catch {
       setError("No connection — check your internet and try again.");
     } finally {
@@ -184,12 +198,13 @@ export default function CreativeManagerModal({
           <div>
             <h2 className="text-lg font-bold text-navy-900">Campaign images</h2>
             <p className="mt-0.5 text-sm text-slate-500">
-              {campaign.name} — the first image is used as the campaign thumbnail.
+              {campaign.name} — the first image is the campaign thumbnail. Changes apply when you
+              hit &ldquo;{finishLabel}&rdquo;.
             </p>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={cancel}
             aria-label="Close"
             className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-900"
           >
@@ -234,7 +249,7 @@ export default function CreativeManagerModal({
                   {creative.format !== "custom" && (
                     <button
                       type="button"
-                      disabled={busyIndex !== null || saving}
+                      disabled={anyBusy}
                       onClick={() => void regenerate(i)}
                       className="flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50"
                     >
@@ -250,8 +265,8 @@ export default function CreativeManagerModal({
                   </button>
                   <button
                     type="button"
-                    disabled={busyIndex !== null || saving}
-                    onClick={() => void remove(i)}
+                    disabled={anyBusy}
+                    onClick={() => update(creatives.filter((_, j) => j !== i))}
                     className="ml-auto flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                   >
                     <Trash2 size={11} /> Remove
@@ -322,6 +337,30 @@ export default function CreativeManagerModal({
               Upload your own photo or video
             </button>
           </div>
+        </div>
+
+        {/* footer: explicit save */}
+        <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-5">
+          {dirty && !saving && (
+            <span className="mr-auto text-xs font-medium text-amber-600">Unsaved image changes</span>
+          )}
+          <button
+            type="button"
+            onClick={cancel}
+            disabled={saving}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-navy-300 hover:text-navy-900 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={anyBusy}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-emerald-500 disabled:opacity-60"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {finishLabel}
+          </button>
         </div>
       </div>
     </div>

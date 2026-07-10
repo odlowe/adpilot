@@ -40,12 +40,15 @@ export default function SettingsModal({
   user,
   businesses,
   onEditBusiness,
+  onAddBusiness,
   onClose,
 }: {
   user: SafeUser;
   businesses: Business[];
   /** Opens the full business editor (the settings modal closes first). */
   onEditBusiness: (business: Business) => void;
+  /** Opens the add-business form (the settings modal closes first). */
+  onAddBusiness: () => void;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -328,6 +331,14 @@ export default function SettingsModal({
                   </li>
                 )}
               </ul>
+              <button
+                type="button"
+                onClick={onAddBusiness}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-emerald-400 hover:text-emerald-700"
+              >
+                <Store size={15} />
+                Add another business
+              </button>
             </div>
           )}
 

@@ -46,9 +46,13 @@ src/lib/
                   support email, session cookie name. Rename the app via env
                   vars — no other file hardcodes "AdPilot" anymore (except
                   internal localStorage keys, deliberately kept).
-  metrics.ts      Deterministic fake analytics (seeded by campaign id) —
-                  30-day series, CTR/CPC/conversions. Replace with real
-                  platform APIs eventually.
+  metrics.ts      Deterministic fake analytics — window-aware (Jul 10):
+                  metricsForCampaign(c, windowDays) + windowDaysFor(cs, tf)
+                  with Timeframe week/month/year/all; per-DATE seeding
+                  (id+date) so numbers are stable across timeframes; spend =
+                  budget/30 per active day within window. TimeframePicker
+                  pills on AnalyticsView + per-campaign modal. Replace with
+                  real platform APIs eventually.
   auth.ts         scrypt password hashing + HMAC-signed session cookie
                   ("adpilot_session"). SESSION_SECRET env var.
   email.ts        Resend-ready (RESEND_API_KEY) else console-logs.
@@ -69,8 +73,10 @@ src/app/          Landing (page.tsx), signup/login/forgot-password/
   api/            auth/{signup,login,logout,forgot,reset}, account (PATCH
                   profile/billing/emailPrefs, DELETE account), businesses
                   (+[id] PATCH/DELETE), campaigns (+[id] PATCH: action
-                  pause/resume/end OR updates{}), generate (real AI, maxDuration
-                  30), creative (AI visual: Claude tagline + branded SVG card →
+                  pause/resume/end OR updates{} — changing industryText or
+                  radius RE-RUNS the AI planner and rewrites adCopyJson +
+                  targetingJson, owner-edited keywords win; maxDuration 30),
+                  generate (real AI, maxDuration 30), creative (AI visual: Claude tagline + branded SVG card →
                   stored like an upload; swap buildAdSvg for a real image API
                   later), upload, billing/{checkout,webhook — signature-verified},
                   cron/digests (STRICT: 401 unless Bearer CRON_SECRET, so

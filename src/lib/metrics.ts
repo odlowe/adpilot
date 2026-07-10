@@ -52,6 +52,44 @@ function mulberry32(seed: number): () => number {
 
 const DAYS = 30;
 const MS_PER_DAY = 86_400_000;
+const MAX_WINDOW_DAYS = 730;
+
+export type Timeframe = "week" | "month" | "year" | "all";
+
+export const TIMEFRAMES: Array<{ key: Timeframe; label: string }> = [
+  { key: "week", label: "Last week" },
+  { key: "month", label: "Last month" },
+  { key: "year", label: "Last year" },
+  { key: "all", label: "All time" },
+];
+
+const TIMEFRAME_DAYS: Record<Exclude<Timeframe, "all">, number> = {
+  week: 7,
+  month: 30,
+  year: 365,
+};
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** Days a campaign has been running (or ran), inclusive. */
+function lifetimeDays(campaign: Campaign): number {
+  const start = startOfDay(new Date(campaign.startDate)).getTime();
+  const end = Math.min(
+    startOfDay(new Date()).getTime(),
+    campaign.endDate ? startOfDay(new Date(campaign.endDate)).getTime() : Infinity
+  );
+  return Math.max(1, Math.round((end - start) / MS_PER_DAY) + 1);
+}
+
+/**
+ * The shared day-window for a timeframe. Every campaign in one view must use
+ * the same window so their daily series line up when aggregated.
+ */
+export function windowDaysFor(campaigns: Campaign[], timeframe: Timeframe): number {
+  if (timeframe !== "all") return TIMEFRAME_DAYS[timeframe];
+  const longest = campaigns.reduce((best, c) => Math.max(best, lifetimeDays(c)), DAYS);
+  return Math.min(MAX_WINDOW_DAYS, longest);
+}
 
 /** Fraction of the campaign's monthly budget delivered so far (0..1). */
 export function budgetProgress(campaign: Campaign): number {
@@ -61,7 +99,14 @@ export function budgetProgress(campaign: Campaign): number {
   return Math.max(0.04, Math.min(1, elapsedDays / cycleDays));
 }
 
-export function metricsForCampaign(campaign: Campaign): Metrics {
+/**
+ * Metrics for one campaign over a day-window ending today.
+ *
+ * Each calendar date's numbers are seeded by campaign id + date, so a given
+ * day shows the SAME figures no matter which timeframe is selected — switching
+ * "Last week" → "Last month" extends the chart without rewriting history.
+ */
+export function metricsForCampaign(campaign: Campaign, windowDays: number = DAYS): Metrics {
   const rand = mulberry32(hashString(campaign.id));
 
   // Personality of this campaign (stable): CPM, CTR, conversion rate.
@@ -69,38 +114,50 @@ export function metricsForCampaign(campaign: Campaign): Metrics {
   const ctrRate = 0.015 + rand() * 0.02; // 1.5%–3.5%
   const convRate = 0.04 + rand() * 0.05; // 4%–9%
 
-  const monthsRun = campaign.status === "completed" ? campaign.durationMonths : 1;
-  const spent = Math.round(campaign.budget * monthsRun * budgetProgress(campaign));
+  const dailyBudget = campaign.budget / 30;
+  const W = Math.max(1, Math.min(MAX_WINDOW_DAYS, Math.round(windowDays)));
 
-  const totalImpressionsTarget = spent * impressionsPerDollar;
+  const today = startOfDay(new Date()).getTime();
+  const activeStart = startOfDay(new Date(campaign.startDate)).getTime();
+  const activeEnd = Math.min(
+    today,
+    campaign.endDate ? startOfDay(new Date(campaign.endDate)).getTime() : Infinity,
+    campaign.continuous ? Infinity : activeStart + (campaign.durationMonths * 30 - 1) * MS_PER_DAY
+  );
 
-  // Build a 30-day daily series with a weekly rhythm plus noise.
   const series: DayPoint[] = [];
-  const today = new Date();
-  const weights: number[] = [];
-  for (let i = 0; i < DAYS; i++) {
-    const wave = 1 + 0.25 * Math.sin((i / 7) * Math.PI * 2);
-    weights.push(wave * (0.7 + rand() * 0.6));
-  }
-  const weightSum = weights.reduce((a, b) => a + b, 0);
-
   let impressions = 0;
   let clicks = 0;
-  for (let i = 0; i < DAYS; i++) {
-    const date = new Date(today.getTime() - (DAYS - 1 - i) * MS_PER_DAY);
-    const dayImpressions = Math.round((totalImpressionsTarget * weights[i]) / weightSum);
-    const dayClicks = Math.round(dayImpressions * ctrRate * (0.8 + rand() * 0.4));
+  let activeDaysInWindow = 0;
+
+  for (let i = 0; i < W; i++) {
+    const dayMs = today - (W - 1 - i) * MS_PER_DAY;
+    const date = new Date(dayMs);
+    const iso = date.toISOString().slice(0, 10);
+    let dayImpressions = 0;
+    let dayClicks = 0;
+
+    if (dayMs >= activeStart && dayMs <= activeEnd) {
+      activeDaysInWindow += 1;
+      const dayRand = mulberry32(hashString(campaign.id + iso));
+      const dayIndex = Math.round((dayMs - activeStart) / MS_PER_DAY);
+      const wave = 1 + 0.25 * Math.sin((dayIndex / 7) * Math.PI * 2);
+      dayImpressions = Math.round(dailyBudget * impressionsPerDollar * wave * (0.7 + dayRand() * 0.6));
+      dayClicks = Math.round(dayImpressions * ctrRate * (0.8 + dayRand() * 0.4));
+    }
+
     impressions += dayImpressions;
     clicks += dayClicks;
     series.push({
-      date: date.toISOString().slice(0, 10),
+      date: iso,
       label: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       impressions: dayImpressions,
       clicks: dayClicks,
     });
   }
 
-  const conversions = Math.max(1, Math.round(clicks * convRate));
+  const spent = Math.round(dailyBudget * activeDaysInWindow);
+  const conversions = clicks > 0 ? Math.max(1, Math.round(clicks * convRate)) : 0;
   return {
     impressions,
     clicks,

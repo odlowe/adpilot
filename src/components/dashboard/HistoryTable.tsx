@@ -4,7 +4,7 @@ import { Archive, BarChart3, Check, Loader2, Pencil, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { readError } from "@/lib/client";
-import { metricsForCampaign, outcomeSummary } from "@/lib/metrics";
+import { metricsForCampaign, outcomeSummary, windowDaysFor } from "@/lib/metrics";
 import type { Campaign } from "@/lib/types";
 
 const money = (n: number) =>
@@ -16,9 +16,11 @@ const fmtDate = (iso: string) =>
 export default function HistoryTable({
   campaigns,
   onViewAnalytics,
+  onManageCreatives,
 }: {
   campaigns: Campaign[];
   onViewAnalytics: (campaign: Campaign) => void;
+  onManageCreatives: (campaign: Campaign) => void;
 }) {
   const router = useRouter();
   const completed = campaigns.filter((c) => c.status === "completed");
@@ -94,7 +96,7 @@ export default function HistoryTable({
           </thead>
           <tbody>
             {completed.map((campaign) => {
-              const metrics = metricsForCampaign(campaign);
+              const metrics = metricsForCampaign(campaign, windowDaysFor([campaign], "all"));
               const renaming = renamingId === campaign.id;
               return (
                 <tr key={campaign.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
@@ -136,6 +138,21 @@ export default function HistoryTable({
                       </span>
                     ) : (
                       <p className="flex items-center gap-1.5 font-semibold text-navy-900">
+                        {campaign.creativeUrl && (
+                          <button
+                            type="button"
+                            onClick={() => onManageCreatives(campaign)}
+                            title="View this campaign's images"
+                            className="shrink-0 rounded-md transition hover:ring-2 hover:ring-emerald-400"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={campaign.creativeUrl}
+                              alt=""
+                              className="h-9 w-9 rounded-md border border-slate-200 object-cover"
+                            />
+                          </button>
+                        )}
                         {campaign.name}
                         <button
                           type="button"
