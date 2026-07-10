@@ -16,10 +16,10 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { budgetProgress } from "@/lib/metrics";
 import { readError } from "@/lib/client";
-import type { Campaign, Platform, PlatformStatus } from "@/lib/types";
+import type { Campaign, CampaignStatus, Platform, PlatformStatus } from "@/lib/types";
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -64,12 +64,27 @@ export default function ActiveCampaigns({
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
 
-  const active = campaigns.filter((c) => c.status === "active" || c.status === "paused");
+  // Optimistic status flips: Pause/Play swaps instantly, the server syncs in
+  // the background, and a failed request rolls the button back.
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, CampaignStatus>>({});
+
+  // Fresh server data arrived (router.refresh() landed) — local overrides done.
+  useEffect(() => setStatusOverrides({}), [campaigns]);
+
+  const withOverrides = campaigns.map((c) =>
+    statusOverrides[c.id] ? { ...c, status: statusOverrides[c.id] } : c
+  );
+  const active = withOverrides.filter((c) => c.status === "active" || c.status === "paused");
 
   async function control(campaign: Campaign, action: "pause" | "resume" | "end") {
     if (action === "end" && !window.confirm(`End "${campaign.name}" for good? It moves to Past Ad Buys and can't be restarted.`)) {
       return;
     }
+    // Flip the UI first — the click should feel instant.
+    const previous = campaign.status;
+    const optimistic: CampaignStatus =
+      action === "pause" ? "paused" : action === "resume" ? "active" : "completed";
+    setStatusOverrides((prev) => ({ ...prev, [campaign.id]: optimistic }));
     setBusyId(campaign.id);
     setError(null);
     try {
@@ -79,11 +94,14 @@ export default function ActiveCampaigns({
         body: JSON.stringify({ action }),
       });
       if (!res.ok) {
+        // Server said no — put the button back the way it was.
+        setStatusOverrides((prev) => ({ ...prev, [campaign.id]: previous }));
         setError(await readError(res));
         return;
       }
       router.refresh();
     } catch {
+      setStatusOverrides((prev) => ({ ...prev, [campaign.id]: previous }));
       setError("No connection — check your internet and try again.");
     } finally {
       setBusyId(null);
@@ -291,7 +309,7 @@ export default function ActiveCampaigns({
                         onClick={() => control(campaign, "resume")}
                         className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-card transition hover:bg-emerald-500 disabled:opacity-60"
                       >
-                        {busyId === campaign.id ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                        <Play size={14} />
                         Resume
                       </button>
                     ) : (
@@ -301,7 +319,7 @@ export default function ActiveCampaigns({
                         onClick={() => control(campaign, "pause")}
                         className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-amber-400 hover:text-amber-700 disabled:opacity-60"
                       >
-                        {busyId === campaign.id ? <Loader2 size={14} className="animate-spin" /> : <Pause size={14} />}
+                        <Pause size={14} />
                         Pause
                       </button>
                     )}

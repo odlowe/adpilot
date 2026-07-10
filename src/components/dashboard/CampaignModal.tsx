@@ -72,6 +72,41 @@ export default function CampaignModal({
 
   const [creativeUrl, setCreativeUrl] = useState<string | null>(null);
 
+  // AI visual generator
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiUrl, setAiUrl] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function generateVisual() {
+    if (aiBusy || aiPrompt.trim().length < 4) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/creative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt.trim(), businessName }),
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setAiError(data.error ?? "Couldn't generate a visual — please try again.");
+        return;
+      }
+      setAiUrl(data.url);
+      setCreativeUrl(data.url);
+    } catch {
+      setAiError("No connection — check your internet and try again.");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  function removeAiVisual() {
+    setAiUrl(null);
+    setCreativeUrl(null);
+  }
+
   // Manual Mode
   const [manualMode, setManualMode] = useState(false);
   const [split, setSplit] = useState<PlatformSplit>({ google: 34, meta: 33, reddit: 33 });
@@ -280,6 +315,65 @@ export default function CampaignModal({
                   </p>
                   <div className="mt-2">
                     <CreativeUploader onUploaded={setCreativeUrl} />
+                  </div>
+
+                  {/* ---- AI visual generator ---- */}
+                  <div className="mt-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-4">
+                    <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
+                      <Sparkles size={15} className="text-emerald-600" /> …or let your agent design one
+                    </p>
+                    <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void generateVisual();
+                          }
+                        }}
+                        disabled={aiBusy}
+                        placeholder="Describe it — e.g. warm bakery counter at sunrise, fresh sourdough"
+                        className="w-full flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:opacity-60"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void generateVisual()}
+                        disabled={aiBusy || aiPrompt.trim().length < 4}
+                        className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-navy-900 px-4 py-2.5 text-xs font-semibold text-white shadow-card transition hover:bg-navy-800 disabled:opacity-50"
+                      >
+                        {aiBusy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                        AI Generate Visuals
+                      </button>
+                    </div>
+                    {aiBusy && (
+                      <div className="mt-3 aspect-[1200/628] w-full animate-pulse rounded-xl bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200" />
+                    )}
+                    {aiError && !aiBusy && (
+                      <p className="mt-2 text-xs font-medium text-red-600">{aiError}</p>
+                    )}
+                    {aiUrl && !aiBusy && (
+                      <div className="relative mt-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={aiUrl}
+                          alt="AI-generated ad visual"
+                          className="w-full rounded-xl border border-slate-200 shadow-card"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeAiVisual}
+                          aria-label="Remove generated visual"
+                          className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-slate-600 shadow-card transition hover:text-red-600"
+                        >
+                          <X size={14} />
+                        </button>
+                        <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                          <CheckCircle2 size={13} /> Attached to this campaign — regenerate anytime
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

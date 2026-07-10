@@ -16,7 +16,7 @@ interface SliderProps {
 }
 
 /**
- * The signature AdPilot control: a large, friendly range slider with a
+ * The signature control of the app: a large, friendly range slider with a
  * live value readout and an emerald progress fill.
  */
 export default function Slider({

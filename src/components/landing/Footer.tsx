@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BRAND } from "@/lib/brand";
 import Logo from "@/components/Logo";
 
 export default function Footer() {
@@ -22,12 +23,12 @@ export default function Footer() {
           <Link href="/privacy" className="transition hover:text-navy-900">
             Privacy Policy
           </Link>
-          <a href="mailto:support@adpilot.example" className="transition hover:text-navy-900">
+          <a href={`mailto:${BRAND.supportEmail}`} className="transition hover:text-navy-900">
             Support
           </a>
         </nav>
         <p className="text-sm text-slate-400">
-          &copy; {new Date().getFullYear()} AdPilot. Made for main street.
+          &copy; {new Date().getFullYear()} {BRAND.name}. {BRAND.tagline}.
         </p>
       </div>
     </footer>

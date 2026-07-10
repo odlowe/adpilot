@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { generateCampaignPlan } from "@/lib/ai";
+import { generateCampaignPlan, isAiConfigured } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
 import { getBusinessById } from "@/lib/db";
+
+// Real model calls can take a while — allow up to 30s on Vercel.
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -33,8 +36,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Simulate the agent thinking so the UI can show its working state.
-  await new Promise((resolve) => setTimeout(resolve, 1400));
+  // With a real model the latency is real; without one, simulate the agent
+  // thinking so the UI can show its working state.
+  if (!isAiConfigured()) {
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+  }
 
   const plan = await generateCampaignPlan(intentText, budget, radiusMiles);
   return NextResponse.json({ plan });

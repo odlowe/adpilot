@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "AdPilot — Get Local Customers on Autopilot",
+  title: `${BRAND.name} — Get Local Customers on Autopilot`,
   description:
     "Your automated AI marketing agent. Set a budget, describe your customer in plain English, and launch ads on Google, Instagram, and Reddit — no tech skills required.",
 };

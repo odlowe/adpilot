@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, Lock, Mail, UserRound } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -24,7 +25,7 @@ const COPY = {
     title: "Welcome back",
     subtitle: "Your campaigns missed you.",
     button: "Log in",
-    switchText: "New to AdPilot?",
+    switchText: `New to ${BRAND.name}?`,
     switchLabel: "Create a free account",
     switchHref: "/signup",
     passwordAutoComplete: "current-password",

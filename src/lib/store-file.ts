@@ -85,6 +85,8 @@ export async function createUser(
     fullName: data.fullName.trim(),
     birthdate: null,
     billingJson: null,
+    stripeCustomerId: null,
+    billingActive: false,
     emailPrefs: { ...DEFAULT_EMAIL_PREFS },
     failedLogins: 0,
     lockedUntil: null,
@@ -126,7 +128,7 @@ export async function clearLoginFailures(id: string): Promise<void> {
 
 export async function updateUser(
   id: string,
-  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash">>
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash" | "stripeCustomerId" | "billingActive">>
 ): Promise<User | null> {
   const user = store.users.get(id);
   if (!user) return null;

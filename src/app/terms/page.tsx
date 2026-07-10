@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 import Footer from "@/components/landing/Footer";
 import Navbar from "@/components/landing/Navbar";
 import { TERMS_PARAGRAPHS } from "@/lib/legal";
 
-export const metadata: Metadata = { title: "Terms of Service — AdPilot" };
+export const metadata: Metadata = { title: `Terms of Service — ${BRAND.name}` };
 
 export default function TermsPage() {
   return (

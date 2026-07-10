@@ -7,14 +7,15 @@ import { aggregateMetrics, metricsForCampaign } from "@/lib/metrics";
  * The digest alarm clock. Vercel Cron hits this daily (see vercel.json);
  * each user gets their report on their chosen cadence:
  *   daily → every run, weekly → Mondays, monthly → the 1st.
- * Optionally protect with a CRON_SECRET env var (Vercel sends it automatically).
+ *
+ * Locked down: requires the CRON_SECRET env var, which Vercel automatically
+ * sends as "Authorization: Bearer <CRON_SECRET>" on scheduled runs. Anyone
+ * else hitting this URL gets a 401 instead of triggering mass email.
  */
 export async function GET(request: Request) {
-  if (process.env.CRON_SECRET) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const auth = request.headers.get("authorization");
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const now = new Date();

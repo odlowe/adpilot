@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Gate authenticated areas. The cookie signature is fully verified in the
@@ -6,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * visitors get a friendly redirect instead of an error.
  */
 export function middleware(request: NextRequest) {
-  const hasSession = request.cookies.has("adpilot_session");
+  const hasSession = request.cookies.has(BRAND.cookieName);
   if (!hasSession) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

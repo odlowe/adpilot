@@ -15,6 +15,8 @@ create table if not exists public.users (
   full_name     text not null default '',
   birthdate     text,
   billing_json  jsonb,
+  stripe_customer_id text,
+  billing_active boolean not null default false,
   email_prefs   jsonb not null default '{"enabled":true,"digestFrequency":"weekly"}'::jsonb,
   failed_logins integer not null default 0,
   locked_until  timestamptz,
@@ -77,3 +79,9 @@ alter table public.users enable row level security;
 alter table public.businesses enable row level security;
 alter table public.campaigns enable row level security;
 alter table public.password_resets enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Upgrading an existing database? Tables already created before Jul 2026 are
+-- missing the Stripe columns — run just these two lines (safe to re-run):
+alter table public.users add column if not exists stripe_customer_id text;
+alter table public.users add column if not exists billing_active boolean not null default false;

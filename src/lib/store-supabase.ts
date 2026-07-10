@@ -43,6 +43,8 @@ interface UserRow {
   full_name: string;
   birthdate: string | null;
   billing_json: BillingInfo | null;
+  stripe_customer_id: string | null;
+  billing_active: boolean | null;
   email_prefs: EmailPrefs | null;
   failed_logins: number | null;
   locked_until: string | null;
@@ -93,6 +95,8 @@ const toUser = (r: UserRow): User => ({
   fullName: r.full_name,
   birthdate: r.birthdate,
   billingJson: r.billing_json,
+  stripeCustomerId: r.stripe_customer_id ?? null,
+  billingActive: r.billing_active ?? false,
   emailPrefs: r.email_prefs ?? { ...DEFAULT_EMAIL_PREFS },
   failedLogins: r.failed_logins ?? 0,
   lockedUntil: r.locked_until,
@@ -226,13 +230,15 @@ export async function clearLoginFailures(id: string): Promise<void> {
 
 export async function updateUser(
   id: string,
-  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash">>
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash" | "stripeCustomerId" | "billingActive">>
 ): Promise<User | null> {
   const rowPatch: Record<string, unknown> = {};
   if (patch.fullName !== undefined) rowPatch.full_name = patch.fullName;
   if (patch.email !== undefined) rowPatch.email = patch.email.toLowerCase().trim();
   if (patch.birthdate !== undefined) rowPatch.birthdate = patch.birthdate;
   if (patch.billingJson !== undefined) rowPatch.billing_json = patch.billingJson;
+  if (patch.stripeCustomerId !== undefined) rowPatch.stripe_customer_id = patch.stripeCustomerId;
+  if (patch.billingActive !== undefined) rowPatch.billing_active = patch.billingActive;
   if (patch.emailPrefs !== undefined) rowPatch.email_prefs = patch.emailPrefs;
   if (patch.passwordHash !== undefined) rowPatch.password_hash = patch.passwordHash;
 

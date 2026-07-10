@@ -10,8 +10,10 @@
  * The HTML uses table layout + inline styles only — the lingua franca that
  * renders correctly in Gmail, Outlook, and Apple Mail alike.
  */
+import { BRAND } from "./brand";
 
-const FROM = process.env.EMAIL_FROM ?? "AdPilot <hello@updates.adpilot.example>";
+
+const FROM = process.env.EMAIL_FROM ?? `${BRAND.name} <hello@updates.adpilot.example>`;
 
 // Brand palette (mirrors tailwind.config.ts)
 const NAVY = "#0f2a52";
@@ -72,7 +74,7 @@ function ctaButton(label: string, url: string): string {
 }
 
 /**
- * Wraps any content in the AdPilot shell: soft grey backdrop, white card,
+ * Wraps any content in the app shell: soft grey backdrop, white card,
  * navy header with the wordmark, friendly footer.
  */
 function emailShell(options: { preheader: string; contentHtml: string }): string {
@@ -109,7 +111,7 @@ function emailShell(options: { preheader: string; contentHtml: string }): string
         <!-- footer -->
         <tr>
           <td style="padding:22px 32px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#94a3b8;line-height:1.7;">
-            &copy; ${new Date().getFullYear()} AdPilot — Made for main street.<br>
+            &copy; ${new Date().getFullYear()} ${BRAND.name} — ${BRAND.tagline}.<br>
             No contracts. Pause anytime. Change email preferences in your dashboard Settings.
           </td>
         </tr>
@@ -131,7 +133,7 @@ const paragraph = (html: string) => `<p style="margin:0 0 16px;">${html}</p>`;
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   return sendEmail({
     to,
-    subject: "Reset your AdPilot password",
+    subject: `Reset your ${BRAND.name} password`,
     text: [
       "Hi,",
       "",
@@ -141,7 +143,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
       "If this wasn't you, ignore this email — your password is unchanged.",
     ].join("\n"),
     html: emailShell({
-      preheader: "Reset your AdPilot password — the link works for one hour.",
+      preheader: `Reset your ${BRAND.name} password — the link works for one hour.`,
       contentHtml: [
         heading("Reset your password"),
         paragraph("Someone (hopefully you) asked to reset the password for this account."),
@@ -180,11 +182,11 @@ export async function sendWelcomeEmail(options: {
 
   return sendEmail({
     to,
-    subject: `Welcome to AdPilot, ${firstName} — your marketing agent is ready`,
+    subject: `Welcome to ${BRAND.name}, ${firstName} — your marketing agent is ready`,
     text: [
       `Hi ${firstName},`,
       "",
-      "Welcome to AdPilot! Your account is ready, and so is your marketing agent.",
+      `Welcome to ${BRAND.name}! Your account is ready, and so is your marketing agent.`,
       "",
       "Getting your first customers is three steps:",
       "  1. Tell it about your business — one sentence about who you want to reach.",
@@ -195,7 +197,7 @@ export async function sendWelcomeEmail(options: {
       "",
       "No contracts. Pause anytime. We're glad you're here.",
       "",
-      "— AdPilot",
+      `— ${BRAND.name}`,
     ].join("\n"),
     html: emailShell({
       preheader: "Your account is ready — three dials and one sentence to your first campaign.",
@@ -278,13 +280,13 @@ export async function sendCampaignReceiptEmail(options: {
       "",
       "RECEIPT (monthly)",
       `  Ad budget (paid to ad networks):  ${usd(budget)}`,
-      `  AdPilot management fee (15%):     ${usd(fee)}`,
+      `  ${BRAND.name} management fee (15%):     ${usd(fee)}`,
       `  ------------------------------------------`,
       `  Total monthly billing:            ${usd(total)}`,
       "",
       "You can pause, edit, or end this campaign anytime from your dashboard — no contracts, no penalties.",
       "",
-      "— AdPilot",
+      `— ${BRAND.name}`,
     ].join("\n"),
     html: emailShell({
       preheader: `${campaignName} is in review — most campaigns go live within 24 hours.`,
@@ -305,7 +307,7 @@ export async function sendCampaignReceiptEmail(options: {
         `<p style="margin:26px 0 8px;font-size:12px;font-weight:bold;letter-spacing:1.5px;color:${SLATE};font-family:Arial,Helvetica,sans-serif;">RECEIPT &nbsp;·&nbsp; MONTHLY</p>
          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;overflow:hidden;">
           ${receiptRow("Ad budget (paid to ad networks)", usd(budget))}
-          ${receiptRow("AdPilot management fee (15%)", usd(fee))}
+          ${receiptRow(`${BRAND.name} management fee (15%)`, usd(fee))}
           ${receiptRow("Total monthly billing", usd(total), true)}
         </table>`,
         dashboardUrl ? ctaButton("View my campaign", dashboardUrl) : "",
@@ -357,7 +359,7 @@ export async function sendCampaignDigest(options: {
       "",
       "Your agent keeps tuning things automatically. See details anytime in your dashboard.",
       "",
-      "— AdPilot (you can change email frequency in Settings)",
+      `— ${BRAND.name} (you can change email frequency in Settings)`,
     ].join("\n"),
     html: emailShell({
       preheader: `${impressions.toLocaleString()} views, ${clicks.toLocaleString()} visitors, ${conversions.toLocaleString()} leads ${periodLabel}.`,

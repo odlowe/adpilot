@@ -32,6 +32,7 @@ export async function POST(request: Request) {
 
   const session = await createCheckoutSession({
     customerEmail: user.email,
+    userId: user.id,
     campaignName: body?.campaignName ?? "Campaign",
     monthlyTotalCents: totalCents,
     successUrl: `${origin}/dashboard?billing=success`,

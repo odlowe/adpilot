@@ -37,9 +37,15 @@ src/lib/
                   SUPABASE_SERVICE_ROLE_KEY set, else local JSON file store.
                   store-file.ts / store-supabase.ts implement IDENTICAL
                   function signatures — keep them in lockstep.
-  ai.ts           MOCK campaign generator (regex vertical/audience detection).
-                  Swap generateCampaignPlan() for a real model call; the
-                  CampaignPlan return type is the contract.
+  ai.ts           REAL Claude campaign generator (raw fetch, no SDK) when
+                  ANTHROPIC_API_KEY is set (model via ANTHROPIC_MODEL, default
+                  claude-sonnet-5); falls back to the regex mock with no key
+                  OR on any API failure, so generation can never break.
+                  Also generateAdTagline() for /api/creative visuals.
+  brand.ts        Single source of app identity: name (NEXT_PUBLIC_APP_NAME),
+                  support email, session cookie name. Rename the app via env
+                  vars — no other file hardcodes "AdPilot" anymore (except
+                  internal localStorage keys, deliberately kept).
   metrics.ts      Deterministic fake analytics (seeded by campaign id) —
                   30-day series, CTR/CPC/conversions. Replace with real
                   platform APIs eventually.
@@ -47,6 +53,10 @@ src/lib/
                   ("adpilot_session"). SESSION_SECRET env var.
   email.ts        Resend-ready (RESEND_API_KEY) else console-logs.
   stripe.ts       Checkout via REST (STRIPE_SECRET_KEY) else "not configured".
+                  Sessions carry client_reference_id=userId. Webhook signature
+                  verification (verifyStripeSignature) implemented; webhook
+                  route handles checkout.session.completed → users.billing_active
+                  true + stripe_customer_id, invoice.payment_failed → false.
   storage.ts      Supabase Storage bucket "creatives" else data-URL fallback.
   samples.ts      Every new business is seeded 3 sample campaigns (isSample).
   legal.ts        ToS/privacy copy for /terms and /privacy pages.
@@ -57,8 +67,12 @@ src/app/          Landing (page.tsx), signup/login/forgot-password/
   api/            auth/{signup,login,logout,forgot,reset}, account (PATCH
                   profile/billing/emailPrefs, DELETE account), businesses
                   (+[id] PATCH/DELETE), campaigns (+[id] PATCH: action
-                  pause/resume/end OR updates{}), generate, upload,
-                  billing/{checkout,webhook}, cron/digests (vercel.json cron).
+                  pause/resume/end OR updates{}), generate (real AI, maxDuration
+                  30), creative (AI visual: Claude tagline + branded SVG card →
+                  stored like an upload; swap buildAdSvg for a real image API
+                  later), upload, billing/{checkout,webhook — signature-verified},
+                  cron/digests (STRICT: 401 unless Bearer CRON_SECRET, so
+                  digests are DEAD until CRON_SECRET is set in Vercel).
 
 src/components/
   landing/        Navbar, Hero (video w/ CSS-animation fallback),
@@ -98,18 +112,38 @@ locked_until on users).
   EXISTS` snippets instead of the full schema.
 - **Vercel env vars set**: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
   SESSION_SECRET.
-- **Not yet set** (features sleep until then): RESEND_API_KEY (email),
-  STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (payments), CRON_SECRET
-  (optional), Supabase Storage bucket "creatives" (public) may not be
-  created yet.
+- **Vercel env vars set**: RESEND_API_KEY (welcome + reset emails live
+  as of Jul 9).
+- **Set Jul 10**: ANTHROPIC_API_KEY (real AI copy/targeting is LIVE;
+  optional ANTHROPIC_MODEL override, default claude-sonnet-5).
+- **Not yet set** (features sleep until then): GEMINI_API_KEY (real AI ad
+  PHOTOS via Google aistudio.google.com/apikey — src/lib/imagegen.ts, model
+  gemini-3.1-flash-image, override with GEMINI_IMAGE_MODEL; without it the
+  visual generator makes SVG concept cards), CRON_SECRET
+  CRON_SECRET (NOW REQUIRED for digest emails — endpoint 401s without it),
+  STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (payments; webhook endpoint is
+  /api/billing/webhook), NEXT_PUBLIC_APP_NAME + NEXT_PUBLIC_SUPPORT_EMAIL +
+  EMAIL_FROM + SESSION_COOKIE_NAME (rebrand tokens — defaults keep "AdPilot"),
+  Supabase Storage bucket "creatives" (public) may not be created yet.
+- **Schema migration needed** (Jul 10): users gained stripe_customer_id +
+  billing_active, AND Owen's live campaigns table had a stale
+  campaigns_status_check constraint (pre-'paused' era) that 500'd every
+  pause — full upgrade snippet at the bottom of supabase/schema.sql.
+  LESSON: his DB predates parts of schema.sql; when adding constraints or
+  columns, always ship ALTER statements, never trust "if not exists" alone.
 
 ## What's real vs simulated
 
-Real: accounts, sessions, businesses, campaigns, editing, pause/resume/end,
-uploads, settings, dark mode — all persisted in Supabase.
-Simulated: campaign copy/targeting (regex mock), ALL analytics numbers
-(deterministic fake), platform "In review/Live" statuses. **No actual ads
-run and no money moves.** Owen knows this.
+Real: accounts, sessions, businesses, campaigns, editing, pause/resume/end
+(now optimistic — flips instantly, rolls back on failure), uploads, settings,
+dark mode, transactional email — all persisted in Supabase. Campaign
+copy/targeting is REAL AI once ANTHROPIC_API_KEY is set.
+Simulated: ALL analytics numbers (deterministic fake), platform "In
+review/Live" statuses. AI visuals: REAL Gemini photos (with reference-image
+support, up to 3, client-side downscaled to 1024px JPEG) once GEMINI_API_KEY
+is set; styled SVG concept cards otherwise. Video generation deliberately
+skipped (cost/latency) — Owen agreed Jul 10. **No actual ads run and no
+money moves.** Owen knows this.
 
 ## Open decisions & next steps
 

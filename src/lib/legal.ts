@@ -1,8 +1,9 @@
 /** Shared legal copy, rendered at /terms and /privacy (linked in the footer). */
+import { BRAND } from "./brand";
 
 export const TERMS_PARAGRAPHS = [
-  "Welcome to AdPilot. By creating an account you agree to these terms, which exist to keep things fair for you and for us.",
-  "The service: AdPilot creates and manages digital advertising campaigns on your behalf across third-party platforms. You choose the budget; we place the ads. Ad spend goes to the advertising platforms; our management fee is 15% of your chosen ad budget, billed monthly alongside it.",
+  `Welcome to ${BRAND.name}. By creating an account you agree to these terms, which exist to keep things fair for you and for us.`,
+  `The service: ${BRAND.name} creates and manages digital advertising campaigns on your behalf across third-party platforms. You choose the budget; we place the ads. Ad spend goes to the advertising platforms; our management fee is 15% of your chosen ad budget, billed monthly alongside it.`,
   "Your responsibilities: you confirm the business information and ad content you provide is accurate, that you have rights to any images or video you upload, and that your ads comply with applicable laws for your industry and location.",
   "Billing and cancellation: plans renew monthly. You can pause or cancel anytime from your dashboard, effective at the end of the current billing cycle. No long-term contracts, no cancellation fees.",
   "Performance: advertising results vary and we do not guarantee specific outcomes such as clicks, customers, or revenue. Estimates shown in the dashboard are projections, not promises.",

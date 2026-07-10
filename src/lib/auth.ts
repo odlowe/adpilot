@@ -1,9 +1,10 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { BRAND } from "./brand";
 import { cookies } from "next/headers";
 import { getUserById } from "./db";
 import type { SafeUser, User } from "./types";
 
-const SESSION_COOKIE = "adpilot_session";
+const SESSION_COOKIE = BRAND.cookieName;
 const SECRET = process.env.SESSION_SECRET ?? "adpilot-dev-secret-change-me";
 
 // ---- passwords ------------------------------------------------------------

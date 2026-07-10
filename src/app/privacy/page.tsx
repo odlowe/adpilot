@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 import Footer from "@/components/landing/Footer";
 import Navbar from "@/components/landing/Navbar";
 import { PRIVACY_PARAGRAPHS } from "@/lib/legal";
 
-export const metadata: Metadata = { title: "Privacy Policy — AdPilot" };
+export const metadata: Metadata = { title: `Privacy Policy — ${BRAND.name}` };
 
 export default function PrivacyPage() {
   return (

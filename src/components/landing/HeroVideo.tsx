@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BRAND } from "@/lib/brand";
 import HeroAnimation from "./HeroAnimation";
 
 /**
@@ -25,7 +26,7 @@ export default function HeroVideo() {
         muted
         playsInline
         preload="metadata"
-        aria-label="AdPilot product tour: one slider, one sentence, live ads everywhere"
+        aria-label={`${BRAND.name} product tour: one slider, one sentence, live ads everywhere`}
         onError={() => setVideoFailed(true)}
       />
     </div>

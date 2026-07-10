@@ -1,8 +1,9 @@
 import { ImageResponse } from "next/og";
+import { BRAND } from "@/lib/brand";
 
 /** The card shown when the site is shared in texts and social posts. */
 export const runtime = "edge";
-export const alt = "AdPilot — Get Local Customers on Autopilot";
+export const alt = `${BRAND.name} — Get Local Customers on Autopilot`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -38,7 +39,8 @@ export default function OpengraphImage() {
             ➤
           </div>
           <div style={{ fontSize: 44, fontWeight: 700 }}>
-            Ad<span style={{ color: "#34d399" }}>Pilot</span>
+            {BRAND.name.slice(0, 2)}
+            <span style={{ color: "#34d399" }}>{BRAND.name.slice(2)}</span>
           </div>
         </div>
         <div style={{ marginTop: 48, fontSize: 76, fontWeight: 800, lineHeight: 1.1 }}>

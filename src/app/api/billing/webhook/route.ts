@@ -1,23 +1,81 @@
 import { NextResponse } from "next/server";
+import { findUserByEmail, getUserById, updateUser } from "@/lib/db";
+import { verifyStripeSignature } from "@/lib/stripe";
 
 /**
- * Stripe webhook receiver (subscription created/updated/cancelled, payment
- * failed, etc.). Skeleton is in place; add signature verification with
- * STRIPE_WEBHOOK_SECRET and event handling when payments go live.
+ * Stripe webhook receiver. Every request must carry a valid
+ * "stripe-signature" header (verified against STRIPE_WEBHOOK_SECRET) —
+ * anything else is rejected, so nobody can spoof a "payment succeeded".
+ *
+ * Handled events:
+ *   checkout.session.completed → mark the user's billing active + remember
+ *                                their Stripe customer id
+ *   invoice.payment_failed     → mark billing inactive (card declined etc.)
  */
 export async function POST(request: Request) {
   const payload = await request.text();
-  const signature = request.headers.get("stripe-signature");
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!process.env.STRIPE_WEBHOOK_SECRET || !signature) {
-    // Not configured yet — acknowledge so Stripe test pings don't error.
-    return NextResponse.json({ received: true, configured: false });
+  if (!secret) {
+    // Refuse to process events we can't authenticate.
+    return NextResponse.json(
+      { error: "Webhook not configured (STRIPE_WEBHOOK_SECRET missing)." },
+      { status: 503 }
+    );
+  }
+  if (!verifyStripeSignature(payload, request.headers.get("stripe-signature"), secret)) {
+    return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
   }
 
-  // TODO when payments launch:
-  //  1. Verify `signature` against STRIPE_WEBHOOK_SECRET
-  //  2. Handle checkout.session.completed → mark campaign as paid/live
-  //  3. Handle invoice.payment_failed → notify the owner, pause campaign
-  console.info(`[stripe:webhook] received ${payload.length} bytes`);
+  const event = JSON.parse(payload) as {
+    type: string;
+    data: {
+      object: {
+        client_reference_id?: string | null;
+        customer?: string | null;
+        customer_email?: string | null;
+        customer_details?: { email?: string | null } | null;
+      };
+    };
+  };
+  const obj = event.data.object;
+
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const user = await findEventUser(obj.client_reference_id, obj.customer_details?.email);
+      if (user) {
+        await updateUser(user.id, {
+          billingActive: true,
+          stripeCustomerId: typeof obj.customer === "string" ? obj.customer : null,
+        });
+      } else {
+        console.warn("[stripe:webhook] checkout completed but no matching user");
+      }
+      break;
+    }
+    case "invoice.payment_failed": {
+      const user = await findEventUser(null, obj.customer_email);
+      if (user) {
+        await updateUser(user.id, { billingActive: false });
+      }
+      break;
+    }
+    default:
+      // Other events are fine to acknowledge without action.
+      break;
+  }
+
   return NextResponse.json({ received: true });
+}
+
+/** Finds our user from a Stripe event: prefer our own id, fall back to email. */
+async function findEventUser(userId?: string | null, email?: string | null) {
+  if (userId) {
+    const byId = await getUserById(userId);
+    if (byId) return byId;
+  }
+  if (email) {
+    return findUserByEmail(email);
+  }
+  return null;
 }

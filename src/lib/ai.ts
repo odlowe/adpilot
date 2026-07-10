@@ -1,11 +1,11 @@
 /**
- * The "Smart Helper" — a deterministic mock of the AI campaign planner.
- * Given a plain-English description of the business + customer, a budget,
- * and a radius, it produces the same structured plan a real model would:
- * ad copy, Google keywords, and Meta/Reddit interest buckets.
+ * The campaign planner ("your agent").
  *
- * Swap `generateCampaignPlan` for a real model call when ready — the
- * return shape (`CampaignPlan`) is the contract the UI renders.
+ * Two engines share the same contract (`CampaignPlan`):
+ *   1. Claude (real AI) — used automatically when ANTHROPIC_API_KEY is set.
+ *   2. A deterministic built-in planner (regex vertical matching) — used with
+ *      no key, and as the safety net if the API call ever fails mid-demo,
+ *      so campaign creation can never break.
  */
 import type { CampaignPlan } from "./types";
 
@@ -102,7 +102,7 @@ function pickBusinessName(intent: string): string {
   return match ? match[1] : "Your Business";
 }
 
-export async function generateCampaignPlan(
+async function generateMockPlan(
   intentText: string,
   budget: number,
   radiusMiles: number
@@ -154,4 +154,202 @@ export async function generateCampaignPlan(
     },
     estMonthlyReach,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Real AI (Anthropic Claude)
+// ---------------------------------------------------------------------------
+
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
+const ANTHROPIC_TIMEOUT_MS = 25_000;
+
+export function isAiConfigured(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+/** One message to Claude, plain text back. Throws on any failure. */
+async function askClaude(system: string, user: string, maxTokens: number): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ANTHROPIC_TIMEOUT_MS);
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY as string,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Anthropic API ${res.status}: ${detail.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+    const text = data.content?.find((block) => block.type === "text")?.text;
+    if (!text) throw new Error("Empty model reply");
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Pulls the first {...} JSON object out of a model reply (fences tolerated). */
+function parseJsonBlock(text: string): unknown {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) throw new Error("No JSON object in model reply");
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+function stringList(value: unknown, min: number, max: number, label: string): string[] {
+  if (!Array.isArray(value)) throw new Error(`${label} missing`);
+  const out = value
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+    .map((v) => v.trim())
+    .slice(0, max);
+  if (out.length < min) throw new Error(`${label} has too few entries`);
+  return out;
+}
+
+const PLAN_SYSTEM_PROMPT = `You are the campaign planner inside a local-advertising product for small business owners.
+Given a plain-English description of a business and its customers, a monthly budget (USD), and a radius (miles), design one hyper-local ad campaign.
+
+Respond with ONLY a valid JSON object — no markdown fences, no commentary — in exactly this shape:
+{
+  "adCopy": {
+    "headlines": [4 short ad headlines, each under 60 characters, warm and specific to THIS business — never generic filler],
+    "descriptions": [3 ad descriptions, each 1-2 sentences, plain neighborly English, no hype words],
+    "callToAction": one of "Learn More" | "Get Offer" | "Book Now" | "Call Now" | "Visit Us" | "Order Online"
+  },
+  "targeting": {
+    "radiusMiles": the radius you were given (number),
+    "audienceSummary": one sentence describing exactly who the ads will reach and why,
+    "googleKeywords": [4-6 search phrases real locals would type, mostly "... near me" style],
+    "metaInterests": [4-6 real Facebook/Instagram interest categories],
+    "redditInterests": [3-5 subreddits formatted like "r/Coffee"; include "Local city subreddit" as one entry]
+  },
+  "estMonthlyReach": [low, high] — estimated monthly ad impressions for this budget, assuming roughly 35-60 impressions per dollar in local markets
+}
+
+Ground everything in the actual business described. If a business name appears, weave it into headlines naturally.`;
+
+/** Validates and tidies whatever the model returned into a strict CampaignPlan. */
+function coercePlan(raw: unknown, budget: number, radiusMiles: number): CampaignPlan {
+  const obj = raw as {
+    adCopy?: { headlines?: unknown; descriptions?: unknown; callToAction?: unknown };
+    targeting?: {
+      audienceSummary?: unknown;
+      googleKeywords?: unknown;
+      metaInterests?: unknown;
+      redditInterests?: unknown;
+    };
+    estMonthlyReach?: unknown;
+  };
+
+  const headlines = stringList(obj.adCopy?.headlines, 2, 5, "headlines").map((h) => h.slice(0, 90));
+  const descriptions = stringList(obj.adCopy?.descriptions, 2, 4, "descriptions").map((d) => d.slice(0, 300));
+  const callToAction =
+    typeof obj.adCopy?.callToAction === "string" && obj.adCopy.callToAction.trim()
+      ? obj.adCopy.callToAction.trim().slice(0, 30)
+      : "Learn More";
+
+  const audienceSummary =
+    typeof obj.targeting?.audienceSummary === "string" && obj.targeting.audienceSummary.trim()
+      ? obj.targeting.audienceSummary.trim().slice(0, 300)
+      : (() => {
+          throw new Error("audienceSummary missing");
+        })();
+
+  let estMonthlyReach: [number, number] = [budget * 35, budget * 60];
+  if (
+    Array.isArray(obj.estMonthlyReach) &&
+    obj.estMonthlyReach.length === 2 &&
+    obj.estMonthlyReach.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0)
+  ) {
+    const [a, b] = obj.estMonthlyReach as [number, number];
+    estMonthlyReach = [Math.round(Math.min(a, b)), Math.round(Math.max(a, b))];
+  }
+
+  return {
+    adCopy: { headlines, descriptions, callToAction },
+    targeting: {
+      radiusMiles,
+      audienceSummary,
+      googleKeywords: stringList(obj.targeting?.googleKeywords, 3, 8, "googleKeywords"),
+      metaInterests: stringList(obj.targeting?.metaInterests, 3, 8, "metaInterests"),
+      redditInterests: stringList(obj.targeting?.redditInterests, 2, 8, "redditInterests"),
+    },
+    estMonthlyReach,
+  };
+}
+
+/**
+ * The public planner. Claude when configured; the built-in planner otherwise
+ * — and as the safety net on any API hiccup, so launch day can't break.
+ */
+export async function generateCampaignPlan(
+  intentText: string,
+  budget: number,
+  radiusMiles: number
+): Promise<CampaignPlan> {
+  if (!isAiConfigured()) {
+    return generateMockPlan(intentText, budget, radiusMiles);
+  }
+  try {
+    const reply = await askClaude(
+      PLAN_SYSTEM_PROMPT,
+      `Business & customers: ${intentText}\nMonthly budget: $${budget}\nRadius: ${radiusMiles} miles`,
+      1200
+    );
+    return coercePlan(parseJsonBlock(reply), budget, radiusMiles);
+  } catch (err) {
+    console.warn(
+      "[ai] Claude call failed — using built-in planner:",
+      err instanceof Error ? err.message : err
+    );
+    return generateMockPlan(intentText, budget, radiusMiles);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tagline writer for the AI visual generator (/api/creative)
+// ---------------------------------------------------------------------------
+
+function promptAsHeadline(prompt: string): string {
+  const s = prompt.trim().replace(/\s+/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Short headline + subline for a generated ad graphic. Never throws. */
+export async function generateAdTagline(
+  prompt: string,
+  businessName?: string
+): Promise<{ headline: string; subline: string }> {
+  const fallback = {
+    headline: (businessName?.trim() || promptAsHeadline(prompt)).slice(0, 48),
+    subline: businessName
+      ? promptAsHeadline(prompt).slice(0, 90)
+      : "Locally owned — right around the corner",
+  };
+  if (!isAiConfigured()) return fallback;
+  try {
+    const reply = await askClaude(
+      `You write on-image ad text for local businesses. Respond with ONLY valid JSON: {"headline": string (max 40 chars, punchy, no quotes inside), "subline": string (max 80 chars, warm and concrete)}. No markdown.`,
+      `Business: ${businessName ?? "a local business"}\nAd visual concept: ${prompt}`,
+      200
+    );
+    const raw = parseJsonBlock(reply) as { headline?: unknown; subline?: unknown };
+    const headline = typeof raw.headline === "string" && raw.headline.trim() ? raw.headline.trim().slice(0, 48) : fallback.headline;
+    const subline = typeof raw.subline === "string" && raw.subline.trim() ? raw.subline.trim().slice(0, 90) : fallback.subline;
+    return { headline, subline };
+  } catch {
+    return fallback;
+  }
 }

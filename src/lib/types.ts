@@ -60,6 +60,10 @@ export interface User {
   fullName: string;
   birthdate: string | null; // yyyy-mm-dd
   billingJson: BillingInfo | null;
+  /** Stripe customer id, set the first time they complete Checkout. */
+  stripeCustomerId: string | null;
+  /** True while their Stripe subscription is in good standing. */
+  billingActive: boolean;
   emailPrefs: EmailPrefs;
   /** Consecutive wrong-password attempts (resets on success). */
   failedLogins: number;
