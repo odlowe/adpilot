@@ -38,4 +38,6 @@ export const listCampaignsByUser = impl.listCampaignsByUser;
 export const updateCampaign = impl.updateCampaign;
 export const updateCampaignStatus = impl.updateCampaignStatus;
 export const createPasswordResetToken = impl.createPasswordResetToken;
+export const createEmailVerificationToken = impl.createEmailVerificationToken;
+export const consumeEmailVerificationToken = impl.consumeEmailVerificationToken;
 export const consumePasswordResetToken = impl.consumePasswordResetToken;

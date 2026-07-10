@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findUserByEmail, getUserById, updateUser } from "@/lib/db";
+import { reportError } from "@/lib/monitor";
 import { verifyStripeSignature } from "@/lib/stripe";
 
 /**
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
   }
 
-  const event = JSON.parse(payload) as {
+  interface StripeEvent {
     type: string;
     data: {
       object: {
@@ -37,7 +38,14 @@ export async function POST(request: Request) {
         customer_details?: { email?: string | null } | null;
       };
     };
-  };
+  }
+  let event: StripeEvent;
+  try {
+    event = JSON.parse(payload) as StripeEvent;
+  } catch (err) {
+    await reportError("stripe:webhook", err, { note: "unparseable payload" });
+    return NextResponse.json({ error: "Bad payload." }, { status: 400 });
+  }
   const obj = event.data.object;
 
   switch (event.type) {

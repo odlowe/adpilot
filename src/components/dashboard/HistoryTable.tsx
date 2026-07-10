@@ -1,9 +1,9 @@
 "use client";
 
-import { Archive, BarChart3, Check, Loader2, Pencil, X } from "lucide-react";
+import { Archive, BarChart3, Check, Loader2, Pencil, RotateCcw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { readError } from "@/lib/client";
+import { readError, startCheckout } from "@/lib/client";
 import { metricsForCampaign, outcomeSummary, windowDaysFor } from "@/lib/metrics";
 import type { Campaign } from "@/lib/types";
 
@@ -24,6 +24,41 @@ export default function HistoryTable({
 }) {
   const router = useRouter();
   const completed = campaigns.filter((c) => c.status === "completed");
+
+  // rerun state
+  const [rerunningId, setRerunningId] = useState<string | null>(null);
+  const [rerunError, setRerunError] = useState<string | null>(null);
+
+  /** Clone a past campaign as a fresh run, then hand off to Stripe. */
+  async function rerun(campaign: Campaign) {
+    setRerunningId(campaign.id);
+    setRerunError(null);
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/rerun`, { method: "POST" });
+      if (!res.ok) {
+        setRerunError(await readError(res));
+        return;
+      }
+      const data = (await res.json()) as { campaign?: Campaign };
+      const fresh = data.campaign;
+
+      // Billing on → Stripe payment page; off → straight to the dashboard.
+      try {
+        const payUrl = await startCheckout(fresh?.name ?? campaign.name, fresh?.budget ?? campaign.budget);
+        if (payUrl) {
+          window.location.href = payUrl;
+          return;
+        }
+      } catch {
+        // Checkout hiccup shouldn't undo the rerun itself.
+      }
+      router.refresh();
+    } catch {
+      setRerunError("No connection — check your internet and try again.");
+    } finally {
+      setRerunningId(null);
+    }
+  }
 
   // inline rename state
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -84,6 +119,11 @@ export default function HistoryTable({
     )}
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
       <div className="overflow-x-auto">
+        {rerunError && (
+          <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+            {rerunError}
+          </p>
+        )}
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -181,14 +221,30 @@ export default function HistoryTable({
                   </td>
                   <td className="px-5 py-4 font-medium text-emerald-700">{outcomeSummary(metrics)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onViewAnalytics(campaign)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700"
-                    >
-                      <BarChart3 size={14} />
-                      View analytics
-                    </button>
+                    <span className="inline-flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={rerunningId !== null}
+                        onClick={() => void rerun(campaign)}
+                        title="Run this exact campaign again — same ads, images, and targeting"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-card transition hover:bg-emerald-500 disabled:opacity-60"
+                      >
+                        {rerunningId === campaign.id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <RotateCcw size={14} />
+                        )}
+                        Rerun campaign
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onViewAnalytics(campaign)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700"
+                      >
+                        <BarChart3 size={14} />
+                        View analytics
+                      </button>
+                    </span>
                   </td>
                 </tr>
               );

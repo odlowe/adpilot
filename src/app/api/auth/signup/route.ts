@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/ratelimit";
 import { createSession, hashPassword, toSafeUser } from "@/lib/auth";
-import { createUser, findUserByEmail } from "@/lib/db";
-import { sendWelcomeEmail } from "@/lib/email";
+import { createEmailVerificationToken, createUser, findUserByEmail } from "@/lib/db";
+import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
+  const limited = rateLimit(request, "signup", 5, 600000);
+  if (limited) return limited;
+
   const body = (await request.json().catch(() => null)) as
     | { email?: string; password?: string; fullName?: string }
     | null;
@@ -34,7 +38,7 @@ export async function POST(request: Request) {
   const user = await createUser({ email, passwordHash: hashPassword(password), fullName });
   createSession(user.id);
 
-  // Welcome email — never let an email hiccup break the signup itself.
+  // Welcome + verification emails — never let an email hiccup break signup.
   try {
     const origin = new URL(request.url).origin;
     await sendWelcomeEmail({
@@ -42,8 +46,14 @@ export async function POST(request: Request) {
       ownerName: user.fullName,
       dashboardUrl: `${origin}/dashboard`,
     });
+    const token = await createEmailVerificationToken(user.id);
+    await sendVerificationEmail(
+      user.email,
+      user.fullName.split(" ")[0] || user.fullName,
+      `${origin}/api/auth/verify?token=${token}`
+    );
   } catch {
-    // Signup still succeeds without the email.
+    // Signup still succeeds without the emails.
   }
 
   return NextResponse.json({ user: toSafeUser(user) }, { status: 201 });

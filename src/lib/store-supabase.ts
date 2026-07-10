@@ -45,6 +45,7 @@ interface UserRow {
   billing_json: BillingInfo | null;
   stripe_customer_id: string | null;
   billing_active: boolean | null;
+  email_verified: boolean | null;
   email_prefs: EmailPrefs | null;
   failed_logins: number | null;
   locked_until: string | null;
@@ -99,6 +100,7 @@ const toUser = (r: UserRow): User => ({
   billingJson: r.billing_json,
   stripeCustomerId: r.stripe_customer_id ?? null,
   billingActive: r.billing_active ?? false,
+  emailVerified: r.email_verified ?? false,
   emailPrefs: r.email_prefs ?? { ...DEFAULT_EMAIL_PREFS },
   failedLogins: r.failed_logins ?? 0,
   lockedUntil: r.locked_until,
@@ -235,7 +237,7 @@ export async function clearLoginFailures(id: string): Promise<void> {
 
 export async function updateUser(
   id: string,
-  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash" | "stripeCustomerId" | "billingActive">>
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash" | "stripeCustomerId" | "billingActive" | "emailVerified">>
 ): Promise<User | null> {
   const rowPatch: Record<string, unknown> = {};
   if (patch.fullName !== undefined) rowPatch.full_name = patch.fullName;
@@ -244,6 +246,7 @@ export async function updateUser(
   if (patch.billingJson !== undefined) rowPatch.billing_json = patch.billingJson;
   if (patch.stripeCustomerId !== undefined) rowPatch.stripe_customer_id = patch.stripeCustomerId;
   if (patch.billingActive !== undefined) rowPatch.billing_active = patch.billingActive;
+  if (patch.emailVerified !== undefined) rowPatch.email_verified = patch.emailVerified;
   if (patch.emailPrefs !== undefined) rowPatch.email_prefs = patch.emailPrefs;
   if (patch.passwordHash !== undefined) rowPatch.password_hash = patch.passwordHash;
 
@@ -462,4 +465,31 @@ export async function deleteUser(id: string): Promise<void> {
   // businesses, campaigns, and reset tokens cascade via foreign keys
   const { error } = await db().from("users").delete().eq("id", id);
   if (error) fail("deleteUser", error.message);
+}
+
+// ---- email verification tokens ------------------------------------------------
+
+export async function createEmailVerificationToken(userId: string): Promise<string> {
+  const token = randomUUID().replace(/-/g, "");
+  const { error } = await db().from("email_verifications").insert({
+    token,
+    user_id: userId,
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+  });
+  if (error) fail("createEmailVerificationToken", error.message);
+  return token;
+}
+
+export async function consumeEmailVerificationToken(token: string): Promise<string | null> {
+  const { data: row, error } = await db()
+    .from("email_verifications")
+    .select("*")
+    .eq("token", token)
+    .maybeSingle();
+  if (error) fail("consumeEmailVerificationToken", error.message);
+  if (!row) return null;
+  await db().from("email_verifications").delete().eq("token", token);
+  const entry = row as { user_id: string; expires_at: string };
+  if (new Date(entry.expires_at).getTime() < Date.now()) return null;
+  return entry.user_id;
 }

@@ -43,6 +43,8 @@ export async function generateAdImage(options: {
   aspectRatio?: string;
   /** Plain-English placement, e.g. "a wide banner strip across the top of a webpage". */
   placement?: string;
+  /** Platform-native composition direction for the placement. */
+  formatStyle?: string;
   /** True when the first reference image is the business's actual logo. */
   logoAttached?: boolean;
 }): Promise<{ bytes: Buffer; contentType: string }> {
@@ -54,6 +56,7 @@ export async function generateAdImage(options: {
     references,
     aspectRatio,
     placement,
+    formatStyle,
     logoAttached,
   } = options;
 
@@ -69,22 +72,26 @@ export async function generateAdImage(options: {
     .join(" ");
 
   const instruction = [
-    "You are an expert advertising creative director producing ONE finished, scroll-stopping digital DISPLAY AD for a local small business. This must read instantly as a designed advertisement — graphic layout with text over imagery — NOT a plain mood photo.",
-    `The business: ${businessLine}.`,
-    `The owner's creative request: "${prompt}"`,
-    placement ? `This exact ad will run as ${placement} — compose the layout for that shape and viewing context.` : "",
-    logoAttached
-      ? "The FIRST attached reference image is the business's actual logo. Reproduce it faithfully and feature it prominently in the foreground — never distorted, never cropped, never blended into background objects."
-      : "",
+    "You are an elite advertising creative director and graphic designer producing ONE finished, scroll-stopping digital DISPLAY AD for a local small business. It must read instantly as a professionally DESIGNED advertisement — a deliberate layout of imagery and type — never a plain mood photo with words floating on it.",
+    `THE BUSINESS: ${businessLine}.`,
+    `THE OWNER'S CREATIVE REQUEST: "${prompt}"`,
+    placement ? `PLACEMENT: this exact ad runs as ${placement}.` : "",
+    formatStyle ? `COMPOSITION FOR THIS PLACEMENT: ${formatStyle}.` : "",
+    "THE PRODUCT IS THE HERO — never an afterthought. Show the product or service moment IN USE: human hands opening, pouring, holding, serving, or wearing it, with crisp macro-level detail of texture and quality. Not a product sitting untouched on a counter. Three-second rule: a viewer must grasp what is being sold at a single glance — one strong subject, zero clutter.",
+    "COLOR DISCIPLINE (60-30-10 rule, non-negotiable): choose ONE cohesive palette and commit to it across the entire ad — roughly 60% a dominant background/environment tone, 30% a secondary tone carried by the product and subject, 10% a single high-contrast accent used ONLY for the call-to-action element. Never mix clashing hues or let colors drift between areas of the frame.",
     references.length > 0
-      ? "The attached reference photos show the real business/products/people — stay faithful to how they actually look so the ad feels authentic."
-      : "",
+      ? "BRAND MATCHING: derive the palette directly from the attached brand images — the ad must look like it belongs to the same family as the logo and photos. Stay faithful to how the real business, products, and people actually look."
+      : "PALETTE MOOD: pick the psychology that fits this business — urgency/deals: saturated warm accents on dark grounds; premium: deep navy, emerald, matte black, soft metallics; wellness/eco/trust/food: sage, warm cream, soft terracotta, earth tones.",
+    "LIGHTING: high-key, soft, diffused light for everyday and lifestyle businesses (clean, welcoming, accessible). Low-key moody contrast is reserved ONLY for explicitly premium/luxury positioning.",
+    "TYPOGRAPHY: bold, highly legible geometric sans-serif type in the family of Inter, Montserrat, or Futura — never script, never serif, never novelty fonts, never warped or hand-drawn lettering. If the logo has distinctive lettering, echo its character. ALL text combined occupies UNDER 20% of the frame. Perfect kerning, perfect spelling, straight baselines.",
     businessName
-      ? `NON-NEGOTIABLE: the business name "${businessName}" must be FRONT AND CENTER — rendered as large, bold, modern graphic type in the foreground design layer, fully inside the frame, perfectly legible even at thumbnail size, with strong contrast against what's behind it (use a subtle panel, gradient scrim, or clean negative space if needed). Never place the name only on a background object like a distant sign, and never crop it.`
+      ? `TEXT LAYERS (exactly three, nothing more): (1) the business name "${businessName}" — large, bold, fully inside the frame, perfectly legible at thumbnail size, set against clean negative space or a subtle scrim, never only on a background object like a distant sign; (2) ONE short supporting line, 3-6 words drawn from the owner's request; (3) a small call-to-action chip/button in the 10% accent color with 2-3 words like "Visit us" or "Order now".`
+      : "TEXT: none — no lettering at all.",
+    logoAttached
+      ? "LOGO: the FIRST attached reference image is the business's actual logo. Reproduce it faithfully — exact colors, exact shapes, never distorted, cropped, redrawn, or blended into background objects — placed clearly (near a corner or on the product/packaging in frame) so the brand registers immediately."
       : "",
-    "Also include ONE short punchy supporting line (3-6 words, drawn from the owner's request) as smaller clean type near the name. Every word spelled perfectly; no other stray text anywhere.",
-    "Backdrop: photorealistic, professional commercial-photography quality — crisp focus, rich color, flattering light, one strong subject, bold contrast. Modern and thumb-stopping; a viewer scrolling past should stop.",
-    "Never include watermarks, other brands' logos, fake awards, or lorem-ipsum-style gibberish text.",
+    "IMAGE QUALITY: photorealistic, professional commercial-photography grade — crisp focus on the hero, shallow depth of field, rich but controlled color. Modern and thumb-stopping.",
+    "NEVER include: watermarks, other brands' logos or trademarks, fake awards or press badges, gibberish or lorem-ipsum text, extra stray words beyond the three text layers.",
   ]
     .filter(Boolean)
     .join(" ");

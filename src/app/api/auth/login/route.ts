@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/ratelimit";
 import { createSession, toSafeUser, verifyPassword } from "@/lib/auth";
 import { clearLoginFailures, findUserByEmail, recordLoginFailure } from "@/lib/db";
 
 export async function POST(request: Request) {
+  const limited = rateLimit(request, "login", 15, 600000);
+  if (limited) return limited;
+
   const body = (await request.json().catch(() => null)) as
     | { email?: string; password?: string }
     | null;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/ratelimit";
 import { getCurrentUser } from "@/lib/auth";
 import { MAX_UPLOAD_BYTES, storeCreative } from "@/lib/storage";
 
@@ -8,6 +9,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Please log in first." }, { status: 401 });
   }
+
+  const limited = rateLimit(request, "upload", 30, 600000, user.id);
+  if (limited) return limited;
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");

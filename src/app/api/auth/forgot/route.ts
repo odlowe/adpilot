@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/ratelimit";
 import { createPasswordResetToken } from "@/lib/db";
 import { isEmailConfigured, sendPasswordResetEmail } from "@/lib/email";
 
@@ -8,6 +9,9 @@ import { isEmailConfigured, sendPasswordResetEmail } from "@/lib/email";
  * reset link is returned directly so the flow works in development/demo.
  */
 export async function POST(request: Request) {
+  const limited = rateLimit(request, "forgot", 3, 600000);
+  if (limited) return limited;
+
   const body = (await request.json().catch(() => null)) as { email?: string } | null;
   const email = body?.email?.trim().toLowerCase() ?? "";
   if (!email) {

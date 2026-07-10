@@ -384,3 +384,30 @@ export async function sendCampaignDigest(options: {
     }),
   });
 }
+
+/** The "confirm your email" message — sent at signup and from the resend button. */
+export async function sendVerificationEmail(to: string, firstName: string, verifyUrl: string) {
+  return sendEmail({
+    to,
+    subject: `Confirm your email, ${firstName}`,
+    text: [
+      `Hi ${firstName},`,
+      "",
+      "One quick click to confirm this is really your email address:",
+      verifyUrl,
+      "",
+      "The link works for 24 hours. If you didn't create this account, ignore this email.",
+    ].join("\n"),
+    html: emailShell({
+      preheader: "One click to confirm your email address.",
+      contentHtml: [
+        heading("Confirm your email"),
+        paragraph(`Hi ${escapeHtml(firstName)} — one quick click to confirm this is really you:`),
+        ctaButton("Confirm my email", verifyUrl),
+        paragraph(
+          `<span style="color:${SLATE};font-size:13px;">The link works for 24 hours. If you didn't create this account, you can ignore this email.</span>`
+        ),
+      ].join(""),
+    }),
+  });
+}

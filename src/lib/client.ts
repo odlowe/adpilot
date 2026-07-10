@@ -22,3 +22,23 @@ export async function readError(res: Response): Promise<string> {
   }
   return `Something went wrong (code ${res.status}). Please try again.`;
 }
+
+/**
+ * Starts Stripe Checkout for a campaign's monthly total (budget + 15% fee).
+ * Returns the hosted payment page URL to redirect to, or null when billing
+ * isn't switched on yet (the app then continues in preview mode).
+ */
+export async function startCheckout(
+  campaignName: string,
+  budget: number
+): Promise<string | null> {
+  const res = await fetch("/api/billing/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ campaignName, budget }),
+  });
+  if (res.status === 501) return null; // billing not configured — preview mode
+  if (!res.ok) throw new Error(await readError(res));
+  const data = (await res.json()) as { url?: string };
+  return data.url ?? null;
+}

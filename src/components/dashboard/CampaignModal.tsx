@@ -18,7 +18,7 @@ import { useRef, useState } from "react";
 import CampaignPreview from "./CampaignPreview";
 import CreativeUploader from "./CreativeUploader";
 import Slider from "@/components/ui/Slider";
-import { readError } from "@/lib/client";
+import { readError, startCheckout } from "@/lib/client";
 import { CREATIVE_FORMATS, FORMAT_LABELS } from "@/lib/creative-formats";
 import type { CampaignCreative, CampaignDraft, CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
 
@@ -278,6 +278,20 @@ export default function CampaignModal({
         setPhase("preview");
         return;
       }
+
+      // Billing switched on? Hand the owner to Stripe's payment page.
+      // The campaign is already created either way — a cancelled checkout
+      // just leaves it in preview mode.
+      try {
+        const payUrl = await startCheckout(`${businessName} — ${intentText.slice(0, 40)}`, budget);
+        if (payUrl) {
+          window.location.href = payUrl;
+          return;
+        }
+      } catch {
+        // Checkout hiccup shouldn't undo a successful launch.
+      }
+
       setPhase("launched");
       onLaunched();
     } catch {

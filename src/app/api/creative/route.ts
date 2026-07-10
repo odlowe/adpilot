@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/ratelimit";
 import { generateAdTagline } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
 import { getBusinessById } from "@/lib/db";
 import { CREATIVE_FORMATS } from "@/lib/creative-formats";
 import { generateAdImage, isImageAiConfigured, type ReferenceImage } from "@/lib/imagegen";
 import type { BrandingImage, CreativeFormat } from "@/lib/types";
+import { reportError } from "@/lib/monitor";
 import { storeCreative } from "@/lib/storage";
 
 export const maxDuration = 60;
@@ -40,6 +42,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Please log in first." }, { status: 401 });
   }
+
+  const limited = rateLimit(request, "creative", 20, 300000, user.id);
+  if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as
     | {
@@ -113,6 +118,7 @@ export async function POST(request: Request) {
         references: [...brandingRefs, ...references].slice(0, 6),
         aspectRatio: formatDef.ratio,
         placement: formatDef.placement,
+        formatStyle: formatDef.style,
         logoAttached,
       });
       const ext = image.contentType.split("/")[1]?.split(";")[0] ?? "png";
@@ -127,7 +133,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ url: stored.url, engine: "photo", format }, { status: 201 });
     } catch (err) {
       const detail = err instanceof Error ? err.message : "";
-      console.warn("[creative] Gemini image failed:", detail || err);
+      await reportError("creative:gemini", err, { format, businessName });
       const friendly = detail.includes("429")
         ? "Google's image service is out of quota — the free allowance is very small. Enable billing on the Google AI account (aistudio.google.com) or wait for the daily reset."
         : "The image generator hit a snag — try again, or reword the description.";

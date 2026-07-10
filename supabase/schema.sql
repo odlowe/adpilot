@@ -17,10 +17,19 @@ create table if not exists public.users (
   billing_json  jsonb,
   stripe_customer_id text,
   billing_active boolean not null default false,
+  email_verified boolean not null default false,
   email_prefs   jsonb not null default '{"enabled":true,"digestFrequency":"weekly"}'::jsonb,
   failed_logins integer not null default 0,
   locked_until  timestamptz,
   created_at    timestamptz not null default now()
+);
+
+-- Email verification tokens (24h, single use)
+create table if not exists public.email_verifications (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.users (id) on delete cascade,
+  token      text not null unique,
+  expires_at timestamptz not null
 );
 
 -- Password reset tokens (short-lived, single use)
@@ -78,6 +87,7 @@ create index if not exists campaigns_business_id_idx on public.campaigns (busine
 -- Lock the tables down: no anonymous access. The app's server (service role)
 -- bypasses RLS by design.
 alter table public.users enable row level security;
+alter table public.email_verifications enable row level security;
 alter table public.businesses enable row level security;
 alter table public.campaigns enable row level security;
 alter table public.password_resets enable row level security;
@@ -95,3 +105,15 @@ alter table public.campaigns add constraint campaigns_status_check check (status
 -- Jul 10 (evening) additions — multi-size ad images + brand assets:
 alter table public.campaigns add column if not exists creatives_json jsonb not null default '[]'::jsonb;
 alter table public.businesses add column if not exists branding_json jsonb not null default '[]'::jsonb;
+
+-- Jul 10 (night) additions — email verification:
+create table if not exists public.email_verifications (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.users (id) on delete cascade,
+  token      text not null unique,
+  expires_at timestamptz not null
+);
+alter table public.email_verifications enable row level security;
+-- Existing accounts are grandfathered in as verified; new signups start false:
+alter table public.users add column if not exists email_verified boolean not null default true;
+alter table public.users alter column email_verified set default false;

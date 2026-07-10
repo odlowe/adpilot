@@ -87,6 +87,7 @@ export async function createUser(
     billingJson: null,
     stripeCustomerId: null,
     billingActive: false,
+    emailVerified: false,
     emailPrefs: { ...DEFAULT_EMAIL_PREFS },
     failedLogins: 0,
     lockedUntil: null,
@@ -128,7 +129,7 @@ export async function clearLoginFailures(id: string): Promise<void> {
 
 export async function updateUser(
   id: string,
-  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash" | "stripeCustomerId" | "billingActive">>
+  patch: Partial<Pick<User, "fullName" | "email" | "birthdate" | "billingJson" | "emailPrefs" | "passwordHash" | "stripeCustomerId" | "billingActive" | "emailVerified">>
 ): Promise<User | null> {
   const user = store.users.get(id);
   if (!user) return null;
@@ -319,4 +320,27 @@ export async function deleteUser(id: string): Promise<void> {
     if (entry.userId === id) store.resetTokens.delete(token);
   }
   persist();
+}
+
+// ---- email verification tokens ------------------------------------------------
+// Ephemeral by design: the file store is a dev/demo backend, and verification
+// links are short-lived, so these live in memory only (not persisted to disk).
+
+const verifyTokens = new Map<string, { userId: string; expiresAt: string }>();
+
+export async function createEmailVerificationToken(userId: string): Promise<string> {
+  const token = randomUUID().replace(/-/g, "");
+  verifyTokens.set(token, {
+    userId,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  });
+  return token;
+}
+
+export async function consumeEmailVerificationToken(token: string): Promise<string | null> {
+  const entry = verifyTokens.get(token);
+  verifyTokens.delete(token);
+  if (!entry) return null;
+  if (new Date(entry.expiresAt).getTime() < Date.now()) return null;
+  return entry.userId;
 }

@@ -59,6 +59,18 @@ export default function DashboardShell({
   const [analyticsTimeframe, setAnalyticsTimeframe] = useState<Timeframe>("all");
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
   const [creativesFor, setCreativesFor] = useState<Campaign | null>(null);
+  const [verifyState, setVerifyState] = useState<"idle" | "sending" | "sent">("idle");
+
+  async function resendVerification() {
+    if (verifyState !== "idle") return;
+    setVerifyState("sending");
+    try {
+      await fetch("/api/auth/verify/resend", { method: "POST" });
+      setVerifyState("sent");
+    } catch {
+      setVerifyState("idle");
+    }
+  }
   /** Campaign waiting on the "editing pauses your ads" confirmation. */
   const [confirmEdit, setConfirmEdit] = useState<Campaign | null>(null);
   const [pausingForEdit, setPausingForEdit] = useState(false);
@@ -209,6 +221,21 @@ export default function DashboardShell({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        {!user.emailVerified && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-medium text-amber-800">
+              Please confirm your email — we sent a link to <strong>{user.email}</strong>.
+            </p>
+            <button
+              type="button"
+              onClick={() => void resendVerification()}
+              disabled={verifyState !== "idle"}
+              className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60"
+            >
+              {verifyState === "sent" ? "Sent — check your inbox" : verifyState === "sending" ? "Sending…" : "Resend the email"}
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-navy-900">

@@ -185,6 +185,51 @@ phone/website (now applied via businessPatchFrom).
    (Google/Meta/Reddit — the months-long moat), email verification,
    error monitoring, lawyer review of legal templates, LLC.
 
+## Jul 10 late-night additions
+
+- **Ad briefing v3** (imagegen.ts): translated Owen's ad-creative framework
+  into still-image terms — 60-30-10 color rule, brand-derived palette from
+  attached logo/brand refs, Inter/Montserrat-class type ≤20% of frame,
+  exactly 3 text layers (name / support line / CTA chip in accent), product
+  as hero IN USE with hands + macro detail, per-format platform-native
+  composition (CREATIVE_FORMATS.style). Video-only parts of his framework
+  (pacing/captions/audio) intentionally deferred until video gen exists.
+- **Rate limiting** (lib/ratelimit.ts): in-memory sliding window, per-IP or
+  per-user; applied to signup 5/10m, login 15/10m, forgot 3/10m,
+  generate 12/m/user, creative 20/5m/user, upload 30/10m/user, monitor
+  10/m/IP, verify-resend 3/10m/user. Honest caveat in file: per-instance
+  memory; upgrade to Upstash if it must be airtight.
+- **Email verification**: users.email_verified + email_verifications table
+  (SOFT gate: login still works, dashboard shows amber banner + resend;
+  hard gate deliberately deferred). Verify link rides a dedicated email at
+  signup; /api/auth/verify consumes token → redirect /dashboard?verified=1.
+  Existing users grandfathered as verified via migration default trick.
+  File store keeps verify tokens in memory only (dev-only backend).
+- **Error monitoring** (lib/monitor.ts): dependency-free Sentry via HTTP
+  store API behind SENTRY_DSN (optional; always console.errors for Vercel
+  logs). global-error.tsx client boundary reports via /api/monitor. Wired
+  into creative, stripe webhook parse, cron digest per-business.
+- **Env vars still pending**: CRON_SECRET (required for digests),
+  STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (test mode), SENTRY_DSN
+  (optional). Migration SQL for this batch at bottom of schema.sql.
+
+## Jul 10 (later) — Stripe actually wired to the UI
+
+- DISCOVERY: /api/billing/checkout existed but NOTHING called it — launches
+  never touched Stripe. Fixed: lib/client.ts startCheckout() helper;
+  CampaignModal launch and the new Rerun flow both call it after creating
+  the campaign, redirect to Stripe's hosted page when configured, silently
+  continue in preview mode on 501. Cancelled checkout leaves the campaign
+  created (acceptable for demo phase; revisit when billing is real).
+- "Rerun campaign" button in Past Ad Buys → POST /api/campaigns/[id]/rerun
+  (clones completed campaign: copy/targeting/images/settings, fresh start
+  date, name gets "(rerun)" suffix without snowballing) → Stripe checkout.
+  Rate limited 10/10m/user.
+- Stripe dashboard note for walkthroughs: new accounts start in a SANDBOX
+  (test keys by default); mode toggle sits top-LEFT in current UI; webhooks
+  live in Workbench (Developers button, bottom-left) → Webhooks →
+  Create new destination.
+
 ## Working conventions with Owen
 
 - Batch requests arrive as long run-on lists — restate as a task list, build

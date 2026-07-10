@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/ratelimit";
 import { generateCampaignPlan, isAiConfigured } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
 import { getBusinessById } from "@/lib/db";
@@ -11,6 +12,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Please log in first." }, { status: 401 });
   }
+
+  const limited = rateLimit(request, "generate", 12, 60000, user.id);
+  if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as
     | { intentText?: string; budget?: number; radiusMiles?: number; businessId?: string }

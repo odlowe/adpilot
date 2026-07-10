@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { listBusinessesByUser, listCampaignsByUser, listUsers } from "@/lib/db";
 import { sendCampaignDigest } from "@/lib/email";
 import { aggregateMetrics, metricsForCampaign } from "@/lib/metrics";
+import { reportError } from "@/lib/monitor";
 
 /**
  * The digest alarm clock. Vercel Cron hits this daily (see vercel.json);
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
       const businessCampaigns = campaigns.filter((c) => c.businessId === business.id);
       if (businessCampaigns.length === 0) continue;
       const metrics = aggregateMetrics(businessCampaigns.map(metricsForCampaign));
+      try {
       await sendCampaignDigest({
         dashboardUrl: `${new URL(request.url).origin}/dashboard`,
         to: user.email,
@@ -62,6 +64,10 @@ export async function GET(request: Request) {
         spent: metrics.spent,
       });
       sent += 1;
+      } catch (err) {
+        // One broken mailbox shouldn't stop everyone else's digest.
+        await reportError("cron:digest", err, { businessId: business.id });
+      }
     }
   }
 

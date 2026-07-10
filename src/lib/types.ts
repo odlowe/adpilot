@@ -82,6 +82,8 @@ export interface User {
   stripeCustomerId: string | null;
   /** True while their Stripe subscription is in good standing. */
   billingActive: boolean;
+  /** True once they've clicked the confirmation link we emailed. */
+  emailVerified: boolean;
   emailPrefs: EmailPrefs;
   /** Consecutive wrong-password attempts (resets on success). */
   failedLogins: number;
