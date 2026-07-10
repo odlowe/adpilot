@@ -81,7 +81,11 @@ alter table public.campaigns enable row level security;
 alter table public.password_resets enable row level security;
 
 -- ---------------------------------------------------------------------------
--- Upgrading an existing database? Tables already created before Jul 2026 are
--- missing the Stripe columns — run just these two lines (safe to re-run):
+-- Upgrading an existing database? Tables created before Jul 2026 are missing
+-- the Stripe columns and may carry an outdated status rule ("create table if
+-- not exists" never updates existing tables). Run these lines (safe to re-run):
 alter table public.users add column if not exists stripe_customer_id text;
 alter table public.users add column if not exists billing_active boolean not null default false;
+alter table public.campaigns drop constraint if exists campaigns_status_check;
+update public.campaigns set status = 'completed' where status not in ('active','paused','completed');
+alter table public.campaigns add constraint campaigns_status_check check (status in ('active','paused','completed'));

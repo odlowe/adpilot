@@ -3,6 +3,7 @@
 import {
   CheckCircle2,
   Gauge,
+  ImagePlus,
   Loader2,
   MapPin,
   Plus,
@@ -13,7 +14,7 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import CampaignPreview from "./CampaignPreview";
 import CreativeUploader from "./CreativeUploader";
 import Slider from "@/components/ui/Slider";
@@ -73,10 +74,51 @@ export default function CampaignModal({
   const [creativeUrl, setCreativeUrl] = useState<string | null>(null);
 
   // AI visual generator
+  interface AiReference {
+    name: string;
+    mimeType: string;
+    data: string; // base64, no data-URL prefix
+  }
+  const MAX_AI_REFS = 3;
   const [aiPrompt, setAiPrompt] = useState("");
+  const [aiRefs, setAiRefs] = useState<AiReference[]>([]);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiUrl, setAiUrl] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const aiRefInputRef = useRef<HTMLInputElement>(null);
+
+  /** Shrink a reference photo to ≤1024px JPEG so the request stays light. */
+  async function fileToReference(file: File): Promise<AiReference | null> {
+    if (!file.type.startsWith("image/")) return null;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const base64 = dataUrl.split(",")[1];
+      if (!base64) return null;
+      return { name: file.name, mimeType: "image/jpeg", data: base64 };
+    } catch {
+      return null;
+    }
+  }
+
+  async function addReferences(files: FileList | null) {
+    if (!files) return;
+    setAiError(null);
+    const room = MAX_AI_REFS - aiRefs.length;
+    const picked = Array.from(files).slice(0, room);
+    const converted = (await Promise.all(picked.map(fileToReference))).filter(
+      (r): r is AiReference => r !== null
+    );
+    if (converted.length > 0) setAiRefs((prev) => [...prev, ...converted].slice(0, MAX_AI_REFS));
+  }
 
   async function generateVisual() {
     if (aiBusy || aiPrompt.trim().length < 4) return;
@@ -86,7 +128,11 @@ export default function CampaignModal({
       const res = await fetch("/api/creative", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt.trim(), businessName }),
+        body: JSON.stringify({
+          prompt: aiPrompt.trim(),
+          businessName,
+          references: aiRefs.map(({ mimeType, data }) => ({ mimeType, data })),
+        }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) {
@@ -322,33 +368,74 @@ export default function CampaignModal({
                     <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
                       <Sparkles size={15} className="text-emerald-600" /> …or let your agent design one
                     </p>
-                    <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
+                    <textarea
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      disabled={aiBusy}
+                      rows={2}
+                      placeholder="Describe the photo in detail — what's in it, the mood, the setting. e.g. our bakery counter at sunrise, fresh sourdough front and center, warm morning light"
+                      className="mt-2.5 w-full resize-none rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:opacity-60"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <input
-                        type="text"
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void generateVisual();
-                          }
+                        ref={aiRefInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          void addReferences(e.target.files);
+                          e.target.value = "";
                         }}
-                        disabled={aiBusy}
-                        placeholder="Describe it — e.g. warm bakery counter at sunrise, fresh sourdough"
-                        className="w-full flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:opacity-60"
                       />
+                      <button
+                        type="button"
+                        onClick={() => aiRefInputRef.current?.click()}
+                        disabled={aiBusy || aiRefs.length >= MAX_AI_REFS}
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50"
+                      >
+                        <ImagePlus size={13} />
+                        {aiRefs.length > 0 ? `Reference photos (${aiRefs.length}/${MAX_AI_REFS})` : "Add reference photos"}
+                      </button>
+                      {aiRefs.map((ref, i) => (
+                        <span key={`${ref.name}-${i}`} className="relative inline-block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`data:${ref.mimeType};base64,${ref.data}`}
+                            alt={ref.name}
+                            className="h-10 w-10 rounded-lg border border-slate-200 object-cover"
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Remove ${ref.name}`}
+                            onClick={() => setAiRefs((prev) => prev.filter((_, j) => j !== i))}
+                            disabled={aiBusy}
+                            className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-slate-500 shadow-card transition hover:text-red-600"
+                          >
+                            <X size={11} />
+                          </button>
+                        </span>
+                      ))}
                       <button
                         type="button"
                         onClick={() => void generateVisual()}
                         disabled={aiBusy || aiPrompt.trim().length < 4}
-                        className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-navy-900 px-4 py-2.5 text-xs font-semibold text-white shadow-card transition hover:bg-navy-800 disabled:opacity-50"
+                        className="ml-auto flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-navy-900 px-4 py-2.5 text-xs font-semibold text-white shadow-card transition hover:bg-navy-800 disabled:opacity-50"
                       >
                         {aiBusy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
                         AI Generate Visuals
                       </button>
                     </div>
                     {aiBusy && (
-                      <div className="mt-3 aspect-[1200/628] w-full animate-pulse rounded-xl bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200" />
+                      <div className="relative mt-3 aspect-[1200/628] w-full overflow-hidden rounded-xl bg-slate-200">
+                        <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-slate-200 via-white/70 to-slate-200" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                          <Sparkles size={22} className="animate-pulse text-emerald-600" />
+                          <p className="text-xs font-semibold text-slate-500">
+                            Your agent is creating your visual — usually 10–20 seconds…
+                          </p>
+                        </div>
+                      </div>
                     )}
                     {aiError && !aiBusy && (
                       <p className="mt-2 text-xs font-medium text-red-600">{aiError}</p>

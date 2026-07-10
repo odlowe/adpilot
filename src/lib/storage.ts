@@ -31,7 +31,10 @@ export async function storeCreative(options: {
       {
         method: "POST",
         headers: {
+          // Both header forms: legacy JWT service keys use Authorization,
+          // new-format Supabase secret keys (sb_secret_...) need apikey.
           Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: process.env.SUPABASE_SERVICE_ROLE_KEY as string,
           "Content-Type": contentType,
           "x-upsert": "false",
         },
@@ -40,11 +43,23 @@ export async function storeCreative(options: {
     );
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
+      // Always leave the real reason in the server logs — "Upload failed"
+      // alone is undiagnosable from the outside.
+      console.warn(`[storage] upload failed (HTTP ${res.status}): ${detail.slice(0, 500)}`);
       if (detail.includes("Bucket not found")) {
         return {
           error:
             'Storage bucket missing — in Supabase go to Storage → New bucket, name it "creatives", and make it public.',
         };
+      }
+      if (detail.toLowerCase().includes("mime type") || detail.includes("not supported")) {
+        return {
+          error:
+            'The storage bucket rejected this file type — in Supabase open the "creatives" bucket settings and clear the "Allowed MIME types" restriction.',
+        };
+      }
+      if (detail.toLowerCase().includes("exceeded") || detail.toLowerCase().includes("too large")) {
+        return { error: "The file is larger than the storage bucket allows — raise the bucket's file size limit in Supabase." };
       }
       return { error: "Upload failed. Please try again." };
     }

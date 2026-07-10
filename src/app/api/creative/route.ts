@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { generateAdTagline } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
+import { generateAdImage, isImageAiConfigured, type ReferenceImage } from "@/lib/imagegen";
 import { storeCreative } from "@/lib/storage";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
+
+const MAX_REFERENCES = 3;
+// ~1.5 MB of raw image per reference (base64 is 4/3 the size). The client
+// downscales to 1024px JPEG before sending, so real payloads are far smaller.
+const MAX_REF_BASE64_CHARS = 2_000_000;
 
 /**
  * "AI Generate Visuals" — turns a plain-English prompt into a polished
@@ -33,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { prompt?: string; businessName?: string }
+    | { prompt?: string; businessName?: string; references?: ReferenceImage[] }
     | null;
   const prompt = body?.prompt?.trim() ?? "";
   const businessName = body?.businessName?.trim() || undefined;
@@ -45,6 +51,42 @@ export async function POST(request: Request) {
     );
   }
 
+  const references: ReferenceImage[] = (Array.isArray(body?.references) ? body.references : [])
+    .filter(
+      (r): r is ReferenceImage =>
+        Boolean(r) &&
+        typeof r.mimeType === "string" &&
+        r.mimeType.startsWith("image/") &&
+        typeof r.data === "string" &&
+        r.data.length > 0 &&
+        r.data.length <= MAX_REF_BASE64_CHARS
+    )
+    .slice(0, MAX_REFERENCES);
+
+  // Real AI photo when a Gemini key is configured.
+  if (isImageAiConfigured()) {
+    try {
+      const image = await generateAdImage({ prompt, businessName, references });
+      const ext = image.contentType.split("/")[1]?.split(";")[0] ?? "png";
+      const stored = await storeCreative({
+        bytes: image.bytes,
+        contentType: image.contentType,
+        filename: `ai-photo.${ext}`,
+      });
+      if ("error" in stored) {
+        return NextResponse.json({ error: stored.error }, { status: 400 });
+      }
+      return NextResponse.json({ url: stored.url, engine: "photo" }, { status: 201 });
+    } catch (err) {
+      console.warn("[creative] Gemini image failed:", err instanceof Error ? err.message : err);
+      return NextResponse.json(
+        { error: "The image generator hit a snag — try again, or reword the description." },
+        { status: 502 }
+      );
+    }
+  }
+
+  // No image key yet: designed concept card (Claude writes the words).
   const { headline, subline } = await generateAdTagline(prompt, businessName);
   const svg = buildAdSvg({ headline, subline, businessName, seed: prompt });
 
@@ -56,7 +98,7 @@ export async function POST(request: Request) {
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
-  return NextResponse.json({ url: result.url }, { status: 201 });
+  return NextResponse.json({ url: result.url, engine: "card" }, { status: 201 });
 }
 
 // ---- SVG scene builder ------------------------------------------------------
