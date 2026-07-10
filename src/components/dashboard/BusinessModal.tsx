@@ -1,9 +1,9 @@
 "use client";
 
-import { AlertTriangle, Loader2, X } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, ImagePlus, Loader2, X } from "lucide-react";
+import { useRef, useState } from "react";
 import { readError } from "@/lib/client";
-import type { Business } from "@/lib/types";
+import type { Business, BrandingImage } from "@/lib/types";
 
 const CATEGORIES = [
   "Home Services",
@@ -31,6 +31,9 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
   const [address, setAddress] = useState(business?.address ?? "");
   const [phone, setPhone] = useState(business?.phone ?? "");
   const [website, setWebsite] = useState(business?.website ?? "");
+  const [branding, setBranding] = useState<BrandingImage[]>(business?.brandingJson ?? []);
+  const [uploadingBrand, setUploadingBrand] = useState(false);
+  const brandInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
       const res = await fetch(editing ? `/api/businesses/${business!.id}` : "/api/businesses", {
         method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, category, description, address, phone, website }),
+        body: JSON.stringify({ name, category, description, address, phone, website, brandingImages: branding }),
       });
       if (!res.ok) {
         setError(await readError(res));
@@ -59,6 +62,31 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
       setError("No connection — check your internet and try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function uploadBranding(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploadingBrand(true);
+    setError(null);
+    try {
+      for (const file of Array.from(files).slice(0, 8 - branding.length)) {
+        if (!file.type.startsWith("image/")) continue;
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: form });
+        const data = (await res.json()) as { url?: string; error?: string };
+        if (res.ok && data.url) {
+          const label: BrandingImage["label"] = /logo/i.test(file.name) ? "Logo" : "Other";
+          setBranding((prev) => [...prev, { url: data.url as string, label }]);
+        } else {
+          setError(data.error ?? "One of the uploads failed.");
+        }
+      }
+    } catch {
+      setError("No connection — check your internet and try again.");
+    } finally {
+      setUploadingBrand(false);
     }
   }
 
@@ -182,6 +210,70 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
               className={`${inputClass} mt-1.5`}
             />
           </div>
+        </div>
+
+        {/* ---- brand images ---- */}
+        <label className={labelClass}>
+          Brand images{" "}
+          <span className="font-normal text-slate-400">(logo, storefront, your work — the AI puts these in your ads)</span>
+        </label>
+        <div className="mt-1.5 flex flex-wrap items-start gap-2.5">
+          {branding.map((img, i) => (
+            <span key={`${img.url.slice(-16)}-${i}`} className="flex flex-col items-center gap-1">
+              <span className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img.url}
+                  alt={img.label}
+                  className="h-16 w-16 rounded-lg border border-slate-200 object-cover"
+                />
+                <button
+                  type="button"
+                  aria-label="Remove image"
+                  onClick={() => setBranding((prev) => prev.filter((_, j) => j !== i))}
+                  className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-slate-500 shadow-card transition hover:text-red-600"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+              <select
+                value={img.label}
+                onChange={(e) =>
+                  setBranding((prev) =>
+                    prev.map((b, j) => (j === i ? { ...b, label: e.target.value as BrandingImage["label"] } : b))
+                  )
+                }
+                className="rounded-lg border border-slate-200 bg-white px-1 py-0.5 text-[11px] text-slate-600 outline-none"
+              >
+                <option>Logo</option>
+                <option>Storefront</option>
+                <option>Product/Work</option>
+                <option>Other</option>
+              </select>
+            </span>
+          ))}
+          <input
+            ref={brandInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              void uploadBranding(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          {branding.length < 8 && (
+            <button
+              type="button"
+              onClick={() => brandInputRef.current?.click()}
+              disabled={uploadingBrand}
+              className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 text-slate-400 transition hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50"
+            >
+              {uploadingBrand ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+              <span className="text-[10px] font-semibold">Add</span>
+            </button>
+          )}
         </div>
 
         {error && (

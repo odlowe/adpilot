@@ -23,11 +23,20 @@ const PLATFORM_LABELS: Record<Platform, string> = {
  */
 export default function EditCampaignModal({
   campaign,
+  onManageImages,
   onClose,
 }: {
   campaign: Campaign;
+  /** Opens the campaign image manager (this modal closes first). */
+  onManageImages: () => void;
   onClose: () => void;
 }) {
+  const creatives =
+    (campaign.creativesJson ?? []).length > 0
+      ? campaign.creativesJson
+      : campaign.creativeUrl
+        ? [{ url: campaign.creativeUrl, format: "custom" as const, createdAt: campaign.createdAt }]
+        : [];
   const router = useRouter();
   const [name, setName] = useState(campaign.name);
   const [budget, setBudget] = useState(campaign.budget);
@@ -376,6 +385,42 @@ export default function EditCampaignModal({
                 </span>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* ---- campaign images ---- */}
+        <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-bold text-navy-900">
+              Ad images{creatives.length > 0 ? ` (${creatives.length})` : ""}
+            </p>
+            <button
+              type="button"
+              onClick={onManageImages}
+              className="rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700"
+            >
+              Preview &amp; edit images
+            </button>
+          </div>
+          {creatives.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {creatives.slice(0, 6).map((c, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${c.url.slice(-16)}-${i}`}
+                  src={c.url}
+                  alt=""
+                  className="h-14 w-14 rounded-lg border border-slate-200 object-cover"
+                />
+              ))}
+              {creatives.length > 6 && (
+                <span className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-slate-300 text-xs font-semibold text-slate-400">
+                  +{creatives.length - 6}
+                </span>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-slate-400">No images yet — add some from the image manager.</p>
           )}
         </div>
 

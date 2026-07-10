@@ -40,6 +40,7 @@ create table if not exists public.businesses (
   address     text not null default '',
   phone       text not null default '',
   website     text not null default '',
+  branding_json jsonb not null default '[]'::jsonb,
   created_at  timestamptz not null default now()
 );
 
@@ -58,6 +59,7 @@ create table if not exists public.campaigns (
   site_categories   jsonb not null default '[]'::jsonb,
   custom_sites      jsonb not null default '[]'::jsonb,
   creative_url      text,
+  creatives_json    jsonb not null default '[]'::jsonb,
   industry_text     text not null,
   targeting_json    jsonb not null default '{}'::jsonb,
   ad_copy_json      jsonb not null default '{}'::jsonb,
@@ -89,3 +91,7 @@ alter table public.users add column if not exists billing_active boolean not nul
 alter table public.campaigns drop constraint if exists campaigns_status_check;
 update public.campaigns set status = 'completed' where status not in ('active','paused','completed');
 alter table public.campaigns add constraint campaigns_status_check check (status in ('active','paused','completed'));
+
+-- Jul 10 (evening) additions — multi-size ad images + brand assets:
+alter table public.campaigns add column if not exists creatives_json jsonb not null default '[]'::jsonb;
+alter table public.businesses add column if not exists branding_json jsonb not null default '[]'::jsonb;

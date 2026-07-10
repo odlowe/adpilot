@@ -19,7 +19,8 @@ import CampaignPreview from "./CampaignPreview";
 import CreativeUploader from "./CreativeUploader";
 import Slider from "@/components/ui/Slider";
 import { readError } from "@/lib/client";
-import type { CampaignDraft, CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
+import { CREATIVE_FORMATS, FORMAT_LABELS } from "@/lib/creative-formats";
+import type { CampaignCreative, CampaignDraft, CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
 
 export const SITE_CATEGORIES = [
   "Local news sites",
@@ -80,12 +81,15 @@ export default function CampaignModal({
     data: string; // base64, no data-URL prefix
   }
   const MAX_AI_REFS = 3;
+  type FormatKey = (typeof CREATIVE_FORMATS)[number]["key"];
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiRefs, setAiRefs] = useState<AiReference[]>([]);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiUrl, setAiUrl] = useState<string | null>(null);
+  const [aiFormats, setAiFormats] = useState<FormatKey[]>(CREATIVE_FORMATS.map((f) => f.key));
+  const [aiBusyMap, setAiBusyMap] = useState<Partial<Record<FormatKey, boolean>>>({});
+  const [aiCreatives, setAiCreatives] = useState<CampaignCreative[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
   const aiRefInputRef = useRef<HTMLInputElement>(null);
+  const aiBusy = Object.values(aiBusyMap).some(Boolean);
 
   /** Shrink a reference photo to ≤1024px JPEG so the request stays light. */
   async function fileToReference(file: File): Promise<AiReference | null> {
@@ -120,38 +124,60 @@ export default function CampaignModal({
     if (converted.length > 0) setAiRefs((prev) => [...prev, ...converted].slice(0, MAX_AI_REFS));
   }
 
+  /** Generates every selected size in parallel; each lands as it finishes. */
   async function generateVisual() {
-    if (aiBusy || aiPrompt.trim().length < 4) return;
-    setAiBusy(true);
+    if (aiBusy || aiPrompt.trim().length < 4 || aiFormats.length === 0) return;
+    const prompt = aiPrompt.trim();
     setAiError(null);
-    try {
-      const res = await fetch("/api/creative", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: aiPrompt.trim(),
-          businessId,
-          businessName,
-          references: aiRefs.map(({ mimeType, data }) => ({ mimeType, data })),
-        }),
-      });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        setAiError(data.error ?? "Couldn't generate a visual — please try again.");
-        return;
-      }
-      setAiUrl(data.url);
-      setCreativeUrl(data.url);
-    } catch {
-      setAiError("No connection — check your internet and try again.");
-    } finally {
-      setAiBusy(false);
-    }
+    setAiBusyMap(Object.fromEntries(aiFormats.map((f) => [f, true])));
+
+    await Promise.all(
+      aiFormats.map(async (format) => {
+        try {
+          const res = await fetch("/api/creative", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt,
+              businessId,
+              businessName,
+              format,
+              references: aiRefs.map(({ mimeType, data }) => ({ mimeType, data })),
+            }),
+          });
+          const data = (await res.json()) as { url?: string; error?: string };
+          if (!res.ok || !data.url) {
+            setAiError(data.error ?? "Couldn't generate a visual — please try again.");
+            return;
+          }
+          const creative: CampaignCreative = {
+            url: data.url,
+            format,
+            prompt,
+            createdAt: new Date().toISOString(),
+          };
+          setAiCreatives((prev) => [...prev.filter((c) => c.format !== format), creative]);
+          // First finished image becomes the campaign's primary creative
+          // unless the owner uploaded their own file.
+          setCreativeUrl((current) => current ?? data.url ?? null);
+        } catch {
+          setAiError("No connection — check your internet and try again.");
+        } finally {
+          setAiBusyMap((prev) => ({ ...prev, [format]: false }));
+        }
+      })
+    );
   }
 
-  function removeAiVisual() {
-    setAiUrl(null);
-    setCreativeUrl(null);
+  function removeAiCreative(format: CampaignCreative["format"]) {
+    setAiCreatives((prev) => {
+      const next = prev.filter((c) => c.format !== format);
+      setCreativeUrl((current) => {
+        const removed = prev.find((c) => c.format === format);
+        return current === removed?.url ? next[0]?.url ?? null : current;
+      });
+      return next;
+    });
   }
 
   // Manual Mode
@@ -237,6 +263,12 @@ export default function CampaignModal({
           siteCategories,
           customSites,
           creativeUrl,
+          creatives: [
+            ...(creativeUrl && !aiCreatives.some((c) => c.url === creativeUrl)
+              ? [{ url: creativeUrl, format: "custom", createdAt: new Date().toISOString() }]
+              : []),
+            ...aiCreatives,
+          ],
           industryText: intentText,
           plan,
         }),
@@ -420,47 +452,80 @@ export default function CampaignModal({
                       <button
                         type="button"
                         onClick={() => void generateVisual()}
-                        disabled={aiBusy || aiPrompt.trim().length < 4}
+                        disabled={aiBusy || aiPrompt.trim().length < 4 || aiFormats.length === 0}
                         className="ml-auto flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-navy-900 px-4 py-2.5 text-xs font-semibold text-white shadow-card transition hover:bg-navy-800 disabled:opacity-50"
                       >
                         {aiBusy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
                         AI Generate Visuals
                       </button>
                     </div>
-                    {aiBusy && (
-                      <div className="relative mt-3 aspect-[1200/628] w-full overflow-hidden rounded-xl bg-slate-200">
-                        <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-slate-200 via-white/70 to-slate-200" />
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                          <Sparkles size={22} className="animate-pulse text-emerald-600" />
-                          <p className="text-xs font-semibold text-slate-500">
-                            Your agent is creating your visual — usually 10–20 seconds…
-                          </p>
-                        </div>
-                      </div>
-                    )}
+
+                    {/* sizes to produce */}
+                    <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                      <span className="text-xs font-semibold text-slate-500">Sizes:</span>
+                      {CREATIVE_FORMATS.map((f) => (
+                        <label key={f.key} className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={aiFormats.includes(f.key)}
+                            disabled={aiBusy}
+                            onChange={(e) =>
+                              setAiFormats((prev) =>
+                                e.target.checked ? [...prev, f.key] : prev.filter((k) => k !== f.key)
+                              )
+                            }
+                            className="h-3.5 w-3.5 accent-emerald-600"
+                          />
+                          {f.label}
+                        </label>
+                      ))}
+                    </div>
+
                     {aiError && !aiBusy && (
                       <p className="mt-2 text-xs font-medium text-red-600">{aiError}</p>
                     )}
-                    {aiUrl && !aiBusy && (
-                      <div className="relative mt-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={aiUrl}
-                          alt="AI-generated ad visual"
-                          className="w-full rounded-xl border border-slate-200 shadow-card"
-                        />
-                        <button
-                          type="button"
-                          onClick={removeAiVisual}
-                          aria-label="Remove generated visual"
-                          className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-slate-600 shadow-card transition hover:text-red-600"
-                        >
-                          <X size={14} />
-                        </button>
-                        <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                          <CheckCircle2 size={13} /> Attached to this campaign — regenerate anytime
-                        </p>
+
+                    {(aiCreatives.length > 0 || aiBusy) && (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {CREATIVE_FORMATS.filter(
+                          (f) => aiBusyMap[f.key] || aiCreatives.some((c) => c.format === f.key)
+                        ).map((f) => {
+                          const made = aiCreatives.find((c) => c.format === f.key);
+                          return (
+                            <div key={f.key} className="rounded-xl border border-slate-200 bg-white p-2.5">
+                              <p className="text-[11px] font-semibold text-slate-500">{FORMAT_LABELS[f.key]}</p>
+                              {aiBusyMap[f.key] ? (
+                                <div className="mt-1.5 flex aspect-video w-full animate-pulse flex-col items-center justify-center gap-1.5 rounded-lg bg-slate-200">
+                                  <Sparkles size={16} className="animate-pulse text-emerald-600" />
+                                  <span className="text-[11px] font-medium text-slate-500">Creating…</span>
+                                </div>
+                              ) : made ? (
+                                <div className="relative mt-1.5">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={made.url}
+                                    alt={`AI ${f.label} ad`}
+                                    className="w-full rounded-lg border border-slate-100 object-contain"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeAiCreative(f.key)}
+                                    aria-label={`Remove ${f.label}`}
+                                    className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1 text-slate-600 shadow-card transition hover:text-red-600"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                       </div>
+                    )}
+                    {aiCreatives.length > 0 && !aiBusy && (
+                      <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                        <CheckCircle2 size={13} /> {aiCreatives.length} image{aiCreatives.length === 1 ? "" : "s"} attached — every size launches with the campaign
+                      </p>
                     )}
                   </div>
                 </div>

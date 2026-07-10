@@ -49,11 +49,13 @@ export default function ActiveCampaigns({
   onCreate,
   onViewAnalytics,
   onEdit,
+  onManageCreatives,
 }: {
   campaigns: Campaign[];
   onCreate: () => void;
   onViewAnalytics: (campaign: Campaign) => void;
   onEdit: (campaign: Campaign) => void;
+  onManageCreatives: (campaign: Campaign) => void;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -171,8 +173,14 @@ export default function ActiveCampaigns({
               <div key={campaign.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    {campaign.creativeUrl &&
-                      (campaign.creativeUrl.startsWith("data:video") ||
+                    {campaign.creativeUrl && (
+                      <button
+                        type="button"
+                        onClick={() => onManageCreatives(campaign)}
+                        title="View & manage this campaign's images"
+                        className="group relative shrink-0 rounded-lg transition hover:ring-2 hover:ring-emerald-400"
+                      >
+                      {campaign.creativeUrl.startsWith("data:video") ||
                       /\.(mp4|webm|mov)($|\?)/i.test(campaign.creativeUrl) ? (
                         <video
                           src={campaign.creativeUrl}
@@ -186,10 +194,12 @@ export default function ActiveCampaigns({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={campaign.creativeUrl}
-                          alt=""
+                          alt="Campaign images"
                           className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 object-cover"
                         />
-                      ))}
+                      )}
+                      </button>
+                    )}
                   <div className="min-w-0">
                     {renaming ? (
                       <span className="flex flex-wrap items-center gap-1.5">

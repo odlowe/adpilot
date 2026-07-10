@@ -39,6 +39,24 @@ export interface Targeting {
   redditInterests: string[];
 }
 
+/** Where an ad image is meant to run — drives its aspect ratio. */
+export type CreativeFormat = "banner" | "landscape" | "square" | "vertical" | "custom";
+
+/** One saved ad image (AI-generated or uploaded). */
+export interface CampaignCreative {
+  url: string;
+  format: CreativeFormat;
+  /** Description used to generate it — lets "Regenerate" re-run the idea. */
+  prompt?: string;
+  createdAt: string;
+}
+
+/** A brand asset the owner uploaded (logo, storefront, product shots…). */
+export interface BrandingImage {
+  url: string;
+  label: "Logo" | "Storefront" | "Product/Work" | "Other";
+}
+
 export interface CampaignPlan {
   adCopy: AdCopy;
   targeting: Targeting;
@@ -84,6 +102,8 @@ export interface Business {
   address: string;
   phone: string;
   website: string;
+  /** Brand assets fed to the AI when generating ad visuals. */
+  brandingJson: BrandingImage[];
   createdAt: string;
 }
 
@@ -104,7 +124,10 @@ export interface Campaign {
   platformSplit: PlatformSplit;
   siteCategories: string[];
   customSites: string[];
+  /** Primary creative (first of creativesJson) — kept for previews/thumbs. */
   creativeUrl: string | null;
+  /** Every ad image on this campaign, across placements/sizes. */
+  creativesJson: CampaignCreative[];
   industryText: string;
   targetingJson: Targeting;
   adCopyJson: AdCopy;

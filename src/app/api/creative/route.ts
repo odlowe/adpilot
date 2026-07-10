@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { generateAdTagline } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
 import { getBusinessById } from "@/lib/db";
+import { CREATIVE_FORMATS } from "@/lib/creative-formats";
 import { generateAdImage, isImageAiConfigured, type ReferenceImage } from "@/lib/imagegen";
+import type { BrandingImage, CreativeFormat } from "@/lib/types";
 import { storeCreative } from "@/lib/storage";
 
 export const maxDuration = 60;
@@ -40,12 +42,25 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { prompt?: string; businessId?: string; businessName?: string; references?: ReferenceImage[] }
+    | {
+        prompt?: string;
+        businessId?: string;
+        businessName?: string;
+        format?: string;
+        references?: ReferenceImage[];
+      }
     | null;
   const prompt = body?.prompt?.trim() ?? "";
   let businessName = body?.businessName?.trim() || undefined;
   let businessCategory: string | undefined;
   let businessDescription: string | undefined;
+  let branding: BrandingImage[] = [];
+
+  // Which placement/size is being generated (default: landscape feed ad).
+  const formatDef =
+    CREATIVE_FORMATS.find((f) => f.key === body?.format) ??
+    CREATIVE_FORMATS.find((f) => f.key === "landscape")!;
+  const format: CreativeFormat = formatDef.key;
 
   // Pull the full business profile so the ad briefing knows who this is for.
   if (body?.businessId) {
@@ -54,6 +69,7 @@ export async function POST(request: Request) {
       businessName = business.name;
       businessCategory = business.category;
       businessDescription = business.description?.trim() || undefined;
+      branding = business.brandingJson ?? [];
     }
   }
 
@@ -79,7 +95,26 @@ export async function POST(request: Request) {
   // Real AI photo when a Gemini key is configured.
   if (isImageAiConfigured()) {
     try {
-      const image = await generateAdImage({ prompt, businessName, businessCategory, businessDescription, references });
+      // Brand assets ride along as references — logo first, so Gemini can
+      // put the real logo front and center.
+      const sortedBranding = [...branding].sort(
+        (a, b) => Number(b.label === "Logo") - Number(a.label === "Logo")
+      );
+      const brandingRefs = (
+        await Promise.all(sortedBranding.slice(0, 3).map((b) => urlToReference(b.url)))
+      ).filter((r): r is ReferenceImage => r !== null);
+      const logoAttached = sortedBranding[0]?.label === "Logo" && brandingRefs.length > 0;
+
+      const image = await generateAdImage({
+        prompt,
+        businessName,
+        businessCategory,
+        businessDescription,
+        references: [...brandingRefs, ...references].slice(0, 6),
+        aspectRatio: formatDef.ratio,
+        placement: formatDef.placement,
+        logoAttached,
+      });
       const ext = image.contentType.split("/")[1]?.split(";")[0] ?? "png";
       const stored = await storeCreative({
         bytes: image.bytes,
@@ -89,7 +124,7 @@ export async function POST(request: Request) {
       if ("error" in stored) {
         return NextResponse.json({ error: stored.error }, { status: 400 });
       }
-      return NextResponse.json({ url: stored.url, engine: "photo" }, { status: 201 });
+      return NextResponse.json({ url: stored.url, engine: "photo", format }, { status: 201 });
     } catch (err) {
       const detail = err instanceof Error ? err.message : "";
       console.warn("[creative] Gemini image failed:", detail || err);
@@ -112,7 +147,7 @@ export async function POST(request: Request) {
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
-  return NextResponse.json({ url: result.url, engine: "card" }, { status: 201 });
+  return NextResponse.json({ url: result.url, engine: "card", format }, { status: 201 });
 }
 
 // ---- SVG scene builder ------------------------------------------------------
@@ -199,4 +234,33 @@ function buildAdSvg(opts: {
   <text font-family="Arial, Helvetica, sans-serif" font-size="${headlineSize}" font-weight="bold" fill="#ffffff">${headlineTspans}</text>
   <text font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#ffffff" opacity="0.85">${sublineTspans}</text>
 </svg>`;
+}
+
+/**
+ * Turns a stored image URL (Supabase public URL or data: URL) into a base64
+ * reference part for Gemini. Returns null on any problem — a missing brand
+ * asset should never block generation.
+ */
+async function urlToReference(url: string): Promise<ReferenceImage | null> {
+  try {
+    if (url.startsWith("data:")) {
+      const match = url.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
+      return match ? { mimeType: match[1], data: match[2] } : null;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) return null;
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.startsWith("image/") || contentType.includes("svg")) return null;
+      const bytes = Buffer.from(await res.arrayBuffer());
+      if (bytes.length > 4 * 1024 * 1024) return null;
+      return { mimeType: contentType.split(";")[0], data: bytes.toString("base64") };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
 }

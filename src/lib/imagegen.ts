@@ -31,14 +31,31 @@ export function isImageAiConfigured(): boolean {
  * Throws with a readable message on any failure — the route decides how
  * to surface it.
  */
+const ALLOWED_RATIOS = new Set(["21:9", "16:9", "1:1", "9:16", "4:3", "3:4", "4:5", "5:4", "3:2", "2:3"]);
+
 export async function generateAdImage(options: {
   prompt: string;
   businessName?: string;
   businessCategory?: string;
   businessDescription?: string;
   references: ReferenceImage[];
+  /** e.g. "16:9" — must be one Gemini supports. */
+  aspectRatio?: string;
+  /** Plain-English placement, e.g. "a wide banner strip across the top of a webpage". */
+  placement?: string;
+  /** True when the first reference image is the business's actual logo. */
+  logoAttached?: boolean;
 }): Promise<{ bytes: Buffer; contentType: string }> {
-  const { prompt, businessName, businessCategory, businessDescription, references } = options;
+  const {
+    prompt,
+    businessName,
+    businessCategory,
+    businessDescription,
+    references,
+    aspectRatio,
+    placement,
+    logoAttached,
+  } = options;
 
   // The invisible half of the prompt: a creative-director briefing that turns
   // whatever the owner types into a modern, click-worthy ad. The owner's own
@@ -52,17 +69,22 @@ export async function generateAdImage(options: {
     .join(" ");
 
   const instruction = [
-    "You are an expert advertising creative director producing ONE finished, scroll-stopping digital advertisement image for a local small business.",
+    "You are an expert advertising creative director producing ONE finished, scroll-stopping digital DISPLAY AD for a local small business. This must read instantly as a designed advertisement — graphic layout with text over imagery — NOT a plain mood photo.",
     `The business: ${businessLine}.`,
     `The owner's creative request: "${prompt}"`,
-    references.length > 0
-      ? "Reference photos of the real business/products/people are attached — stay faithful to how they actually look; the ad must feel authentic to this exact business."
+    placement ? `This exact ad will run as ${placement} — compose the layout for that shape and viewing context.` : "",
+    logoAttached
+      ? "The FIRST attached reference image is the business's actual logo. Reproduce it faithfully and feature it prominently in the foreground — never distorted, never cropped, never blended into background objects."
       : "",
-    "Creative direction: photorealistic, professional commercial-photography quality — crisp focus, rich color, flattering natural light. Modern, thumb-stopping composition built for social feeds: one strong subject, bold contrast, shallow depth of field, a little clean negative space. Warm and inviting, like a beloved neighborhood spot you want to visit today.",
+    references.length > 0
+      ? "The attached reference photos show the real business/products/people — stay faithful to how they actually look so the ad feels authentic."
+      : "",
     businessName
-      ? `The business name may appear naturally in the scene (storefront signage or one short, clean line of type) — if any text appears it must be spelled exactly "${businessName}" and nothing else.`
-      : "Do not add any text or lettering.",
-    "Never include watermarks, other brands' logos, or fake awards. Landscape orientation, standard 1200x628 ad format.",
+      ? `NON-NEGOTIABLE: the business name "${businessName}" must be FRONT AND CENTER — rendered as large, bold, modern graphic type in the foreground design layer, fully inside the frame, perfectly legible even at thumbnail size, with strong contrast against what's behind it (use a subtle panel, gradient scrim, or clean negative space if needed). Never place the name only on a background object like a distant sign, and never crop it.`
+      : "",
+    "Also include ONE short punchy supporting line (3-6 words, drawn from the owner's request) as smaller clean type near the name. Every word spelled perfectly; no other stray text anywhere.",
+    "Backdrop: photorealistic, professional commercial-photography quality — crisp focus, rich color, flattering light, one strong subject, bold contrast. Modern and thumb-stopping; a viewer scrolling past should stop.",
+    "Never include watermarks, other brands' logos, fake awards, or lorem-ipsum-style gibberish text.",
   ]
     .filter(Boolean)
     .join(" ");
@@ -85,6 +107,11 @@ export async function generateAdImage(options: {
         model: GEMINI_IMAGE_MODEL,
         input,
         store: false,
+        response_format: {
+          type: "image",
+          mime_type: "image/png",
+          aspect_ratio: aspectRatio && ALLOWED_RATIOS.has(aspectRatio) ? aspectRatio : "16:9",
+        },
       }),
       signal: controller.signal,
     });

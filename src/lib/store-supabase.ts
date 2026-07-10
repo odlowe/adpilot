@@ -60,6 +60,7 @@ interface BusinessRow {
   address: string | null;
   phone: string | null;
   website: string | null;
+  branding_json: unknown;
   created_at: string;
 }
 
@@ -77,6 +78,7 @@ interface CampaignRow {
   site_categories: string[];
   custom_sites: string[];
   creative_url: string | null;
+  creatives_json: unknown;
   industry_text: string;
   targeting_json: Targeting;
   ad_copy_json: AdCopy;
@@ -112,6 +114,7 @@ const toBusiness = (r: BusinessRow): Business => ({
   address: r.address ?? "",
   phone: r.phone ?? "",
   website: r.website ?? "",
+  brandingJson: (r.branding_json as Business["brandingJson"]) ?? [],
   createdAt: r.created_at,
 });
 
@@ -129,6 +132,7 @@ const toCampaign = (r: CampaignRow): Campaign => ({
   siteCategories: r.site_categories ?? [],
   customSites: r.custom_sites ?? [],
   creativeUrl: r.creative_url,
+  creativesJson: (r.creatives_json as Campaign["creativesJson"]) ?? [],
   industryText: r.industry_text,
   targetingJson: r.targeting_json,
   adCopyJson: r.ad_copy_json,
@@ -153,6 +157,7 @@ const campaignToRow = (c: Omit<Campaign, "id" | "createdAt"> & { createdAt?: str
   site_categories: c.siteCategories,
   custom_sites: c.customSites,
   creative_url: c.creativeUrl,
+  creatives_json: c.creativesJson,
   industry_text: c.industryText,
   targeting_json: c.targetingJson,
   ad_copy_json: c.adCopyJson,
@@ -281,11 +286,15 @@ export async function createBusiness(
 export async function updateBusiness(
   id: string,
   userId: string,
-  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website">>
+  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website" | "brandingJson">>
 ): Promise<Business | null> {
+  // Columns are snake_case; map the one camelCase field explicitly.
+  const { brandingJson, ...rest } = patch;
+  const rowPatch: Record<string, unknown> = { ...rest };
+  if (brandingJson !== undefined) rowPatch.branding_json = brandingJson;
   const { data: row, error } = await db()
     .from("businesses")
-    .update(patch)
+    .update(rowPatch)
     .eq("id", id)
     .eq("user_id", userId)
     .select("*")
@@ -361,10 +370,14 @@ export async function updateCampaign(
       | "siteCategories"
       | "customSites"
       | "targetingJson"
+      | "creativeUrl"
+      | "creativesJson"
     >
   >
 ): Promise<Campaign | null> {
   const rowPatch: Record<string, unknown> = {};
+  if (patch.creativeUrl !== undefined) rowPatch.creative_url = patch.creativeUrl;
+  if (patch.creativesJson !== undefined) rowPatch.creatives_json = patch.creativesJson;
   if (patch.name !== undefined) rowPatch.name = patch.name;
   if (patch.budget !== undefined) rowPatch.budget = patch.budget;
   if (patch.zip !== undefined) rowPatch.zip = patch.zip;

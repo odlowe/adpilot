@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { createBusiness, listBusinessesByUser } from "@/lib/db";
+import { businessPatchFrom } from "@/lib/business-patch";
+import { createBusiness, updateBusiness, listBusinessesByUser } from "@/lib/db";
 import type { BusinessCategory } from "@/lib/types";
 
 const CATEGORIES: BusinessCategory[] = [
@@ -37,6 +38,14 @@ export async function POST(request: Request) {
     ? (body?.category as BusinessCategory)
     : "Other";
 
-  const business = await createBusiness({ userId: user.id, name, category });
+  let business = await createBusiness({ userId: user.id, name, category });
+
+  // Profile + brand images arrive with the same request — persist them too
+  // (previously these were silently dropped on create).
+  const patch = businessPatchFrom(body);
+  if (Object.keys(patch).length > 0) {
+    business = (await updateBusiness(business.id, user.id, patch)) ?? business;
+  }
+
   return NextResponse.json({ business }, { status: 201 });
 }

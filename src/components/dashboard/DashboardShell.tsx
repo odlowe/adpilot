@@ -21,6 +21,7 @@ import AnalyticsPanel from "./AnalyticsPanel";
 import AnalyticsView from "./AnalyticsView";
 import BusinessModal from "./BusinessModal";
 import CampaignModal from "./CampaignModal";
+import CreativeManagerModal from "./CreativeManagerModal";
 import EditCampaignModal from "./EditCampaignModal";
 import HistoryTable from "./HistoryTable";
 import SettingsModal from "./SettingsModal";
@@ -55,6 +56,7 @@ export default function DashboardShell({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analyticsCampaign, setAnalyticsCampaign] = useState<Campaign | null>(null);
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
+  const [creativesFor, setCreativesFor] = useState<Campaign | null>(null);
   /** Campaign waiting on the "editing pauses your ads" confirmation. */
   const [confirmEdit, setConfirmEdit] = useState<Campaign | null>(null);
   const [pausingForEdit, setPausingForEdit] = useState(false);
@@ -255,6 +257,7 @@ export default function DashboardShell({
           {tab === "campaigns" && (
             <ActiveCampaigns
               campaigns={businessCampaigns}
+              onManageCreatives={setCreativesFor}
               onCreate={() => setCampaignModalOpen(true)}
               onViewAnalytics={setAnalyticsCampaign}
               onEdit={requestEdit}
@@ -363,8 +366,19 @@ export default function DashboardShell({
         </div>
       )}
 
+      {creativesFor && (
+        <CreativeManagerModal campaign={creativesFor} onClose={() => setCreativesFor(null)} />
+      )}
       {editCampaign && (
-        <EditCampaignModal campaign={editCampaign} onClose={() => void closeEdit()} />
+        <EditCampaignModal
+          campaign={editCampaign}
+          onManageImages={() => {
+            const target = editCampaign;
+            void closeEdit();
+            setCreativesFor(target);
+          }}
+          onClose={() => void closeEdit()}
+        />
       )}
 
       {bizModal && (

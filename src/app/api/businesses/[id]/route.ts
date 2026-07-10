@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cleanBranding } from "@/lib/business-patch";
 import { getCurrentUser } from "@/lib/auth";
 import { deleteBusiness, listBusinessesByUser, updateBusiness } from "@/lib/db";
 import type { BusinessCategory } from "@/lib/types";
@@ -36,7 +37,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
-  const patch: Record<string, string> = {};
+  const patch: Parameters<typeof updateBusiness>[2] = {};
   if (typeof body.name === "string") {
     if (body.name.trim().length < 2) {
       return NextResponse.json({ error: "Please enter a business name." }, { status: 400 });
@@ -44,12 +45,15 @@ export async function PATCH(
     patch.name = body.name.trim();
   }
   if (typeof body.category === "string" && CATEGORIES.includes(body.category as BusinessCategory)) {
-    patch.category = body.category;
+    patch.category = body.category as BusinessCategory;
   }
   if (typeof body.description === "string") patch.description = body.description.trim().slice(0, 2000);
   if (typeof body.address === "string") patch.address = body.address.trim().slice(0, 300);
   if (typeof body.phone === "string") patch.phone = body.phone.trim().slice(0, 40);
   if (typeof body.website === "string") patch.website = body.website.trim().slice(0, 200);
+  if ((body as { brandingImages?: unknown }).brandingImages !== undefined) {
+    patch.brandingJson = cleanBranding((body as { brandingImages?: unknown }).brandingImages);
+  }
 
   const business = await updateBusiness(params.id, user.id, patch);
   if (!business) {

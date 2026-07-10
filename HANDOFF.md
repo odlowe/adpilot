@@ -142,11 +142,24 @@ Real: accounts, sessions, businesses, campaigns, editing, pause/resume/end
 dark mode, transactional email — all persisted in Supabase. Campaign
 copy/targeting is REAL AI once ANTHROPIC_API_KEY is set.
 Simulated: ALL analytics numbers (deterministic fake), platform "In
-review/Live" statuses. AI visuals: REAL Gemini photos (with reference-image
-support, up to 3, client-side downscaled to 1024px JPEG) once GEMINI_API_KEY
-is set; styled SVG concept cards otherwise. Video generation deliberately
-skipped (cost/latency) — Owen agreed Jul 10. **No actual ads run and no
-money moves.** Owen knows this.
+review/Live" statuses. AI visuals: REAL Gemini ads once GEMINI_API_KEY set
+(billing enabled Jul 10) — briefing demands business name/logo front-and-
+center as designed display ads; business brandingJson (logo first) is
+auto-attached as Gemini references; 4 sizes per click via response_format
+aspect_ratio (banner 21:9 / landscape 16:9 / square 1:1 / vertical 9:16,
+defined in lib/creative-formats.ts). SVG concept-card fallback without a key
+(fallback is 1200x628 only — not size-aware; fine since prod has a key).
+Video generation deliberately skipped (cost/latency) — Owen agreed Jul 10.
+**No actual ads run and no money moves.** Owen knows this.
+
+Creative system (Jul 10 evening): Campaign.creativesJson [{url,format,
+prompt?,createdAt}] with creativeUrl kept in sync as [0] (thumbnail);
+Business.brandingJson [{url,label: Logo|Storefront|Product/Work|Other}].
+CreativeManagerModal (campaign card thumbnail click + Edit Campaign button)
+= view/remove/add/regenerate/download; regenerate re-runs stored prompt.
+Validators in lib/creative-validate.ts + lib/business-patch.ts. FIXED
+pre-existing bug: businesses POST silently dropped description/address/
+phone/website (now applied via businessPatchFrom).
 
 ## Open decisions & next steps
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { listCampaignsByUser, updateCampaign, updateCampaignStatus } from "@/lib/db";
+import { cleanCreatives } from "@/lib/creative-validate";
 import type { PlatformSplit } from "@/lib/types";
 
 const ACTIONS = {
@@ -62,6 +63,7 @@ export async function PATCH(
           platformSplit?: PlatformSplit;
           siteCategories?: string[];
           customSites?: string[];
+          creatives?: unknown;
         };
       }
     | null;
@@ -95,6 +97,13 @@ export async function PATCH(
     if (customSites !== undefined) {
       patch.customSites = customSites;
       patch.manualMode = true;
+    }
+
+    // Full replacement of the campaign's image set (from the image manager).
+    if (body.updates.creatives !== undefined) {
+      const creatives = cleanCreatives(body.updates.creatives);
+      patch.creativesJson = creatives;
+      patch.creativeUrl = creatives[0]?.url ?? null;
     }
 
     // Targeting lives inside targetingJson — merge with what's there now.

@@ -74,6 +74,7 @@ export async function buildSampleCampaigns(
       siteCategories: [],
       customSites: [],
       creativeUrl: null,
+      creativesJson: [],
       industryText: intent,
       targetingJson: plan.targeting,
       adCopyJson: plan.adCopy,

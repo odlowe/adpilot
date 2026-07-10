@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cleanCreatives } from "@/lib/creative-validate";
 import { getCurrentUser } from "@/lib/auth";
 import { createCampaign, getBusinessById, listCampaignsByUser } from "@/lib/db";
 import { sendCampaignReceiptEmail } from "@/lib/email";
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
         siteCategories?: string[];
         customSites?: string[];
         creativeUrl?: string | null;
+        creatives?: unknown;
         industryText?: string;
         plan?: CampaignPlan;
       }
@@ -76,7 +78,11 @@ export async function POST(request: Request) {
       : { google: 34, meta: 33, reddit: 33 },
     siteCategories: (body.siteCategories ?? []).map((s) => String(s).slice(0, 60)).slice(0, 20),
     customSites: (body.customSites ?? []).map((s) => String(s).slice(0, 120)).slice(0, 25),
-    creativeUrl: typeof body.creativeUrl === "string" ? body.creativeUrl : null,
+    creativeUrl:
+      typeof body.creativeUrl === "string"
+        ? body.creativeUrl
+        : cleanCreatives(body.creatives)[0]?.url ?? null,
+    creativesJson: cleanCreatives(body.creatives),
     industryText: summary,
     targetingJson: body.plan.targeting,
     adCopyJson: body.plan.adCopy,
