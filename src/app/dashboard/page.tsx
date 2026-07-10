@@ -7,7 +7,11 @@ import { listBusinessesByUser, listCampaignsByUser } from "@/lib/db";
 
 export const metadata: Metadata = { title: `Dashboard — ${BRAND.name}` };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: { billing?: string; verified?: string };
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/dashboard");
 
@@ -18,5 +22,17 @@ export default async function DashboardPage() {
 
   if (businesses.length === 0) redirect("/onboarding");
 
-  return <DashboardShell user={user} businesses={businesses} campaigns={campaigns} />;
+  // One-time notices carried back on the URL (Stripe redirect, verify link).
+  const notice =
+    searchParams?.billing === "success"
+      ? ("billing-success" as const)
+      : searchParams?.billing === "cancelled"
+        ? ("billing-cancelled" as const)
+        : searchParams?.verified === "1"
+          ? ("verified" as const)
+          : searchParams?.verified === "0"
+            ? ("verify-failed" as const)
+            : null;
+
+  return <DashboardShell user={user} businesses={businesses} campaigns={campaigns} notice={notice} />;
 }

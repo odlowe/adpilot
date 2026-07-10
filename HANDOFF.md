@@ -244,6 +244,26 @@ phone/website (now applied via businessPatchFrom).
   consumed reset link auto-verifies (possession of inbox proven) — airtight
   without locking out password recovery.
 
+## Jul 10 (v2 final) — gate switch, digest windows, checkout notices
+
+- lib/verification-gate.ts: REQUIRE_EMAIL_VERIFICATION=true (Vercel env, OFF
+  by default) blocks campaigns POST, rerun, generate, creative for unverified
+  users. Owen flips it when demos are done.
+- Cron digests now use windowed metrics matching frequency (daily=1d,
+  weekly=7d, monthly=30d) so numbers match the subject line.
+- Dashboard one-time notice banner via URL params: billing=success/cancelled
+  (Stripe redirect) and verified=1/0 (email link) → DashboardShell notice prop.
+
+## Jul 10 — briefing v6 (quality control pass)
+Owen reviewed generated ads: v5 had vertical dead-space in text columns and
+one ad rendered fake phone UI (battery/clock/signal). Added two CRITICAL
+QUALITY CONTROL blocks to the briefing: (1) text group vertically centered as
+one unit, even padding, scale-to-fit, ≤45% width text columns, flat clean
+text-zone backgrounds; (2) absolute ban on device UI elements and mockup
+frames — raw ad-manager-ready asset only. The 9:16 vertical format style
+mentions native story energy — watch whether that keeps tempting the model
+toward phone chrome; if UI artifacts persist, soften that line next.
+
 ## Working conventions with Owen
 
 - Batch requests arrive as long run-on lists — restate as a task list, build

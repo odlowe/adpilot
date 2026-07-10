@@ -40,14 +40,34 @@ const TABS: Array<{ key: Tab; label: string; icon: typeof Megaphone }> = [
   { key: "history", label: "Past Ad Buys", icon: History },
 ];
 
+export type DashboardNotice = "billing-success" | "billing-cancelled" | "verified" | "verify-failed";
+
+const NOTICES: Record<DashboardNotice, { tone: "good" | "warn"; text: string }> = {
+  "billing-success": {
+    tone: "good",
+    text: "Payment received — your campaign is fully set up. A receipt is on its way to your inbox.",
+  },
+  "billing-cancelled": {
+    tone: "warn",
+    text: "Checkout was cancelled — your campaign is saved and running in preview mode. You can complete payment any time by relaunching it.",
+  },
+  verified: { tone: "good", text: "Email confirmed — you're all set." },
+  "verify-failed": {
+    tone: "warn",
+    text: "That confirmation link expired or was already used — send yourself a fresh one below.",
+  },
+};
+
 export default function DashboardShell({
   user,
   businesses,
   campaigns,
+  notice = null,
 }: {
   user: SafeUser;
   businesses: Business[];
   campaigns: Campaign[];
+  notice?: DashboardNotice | null;
 }) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(businesses[0]?.id ?? "");
@@ -60,6 +80,7 @@ export default function DashboardShell({
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
   const [creativesFor, setCreativesFor] = useState<Campaign | null>(null);
   const [verifyState, setVerifyState] = useState<"idle" | "sending" | "sent">("idle");
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
 
   async function resendVerification() {
     if (verifyState !== "idle") return;
@@ -221,6 +242,31 @@ export default function DashboardShell({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        {notice && !noticeDismissed && (
+          <div
+            className={`mb-6 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+              NOTICES[notice].tone === "good"
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <p
+              className={`text-sm font-medium ${
+                NOTICES[notice].tone === "good" ? "text-emerald-800" : "text-amber-800"
+              }`}
+            >
+              {NOTICES[notice].text}
+            </p>
+            <button
+              type="button"
+              onClick={() => setNoticeDismissed(true)}
+              aria-label="Dismiss"
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/60 hover:text-navy-900"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
         {!user.emailVerified && (
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm font-medium text-amber-800">

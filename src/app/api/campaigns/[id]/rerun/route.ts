@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verificationGate } from "@/lib/verification-gate";
 import { getCurrentUser } from "@/lib/auth";
 import { createCampaign, listCampaignsByUser } from "@/lib/db";
 import { rateLimit } from "@/lib/ratelimit";
@@ -17,6 +18,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Please log in first." }, { status: 401 });
   }
+
+  const unverified = verificationGate(user);
+  if (unverified) return unverified;
 
   const limited = rateLimit(request, "rerun", 10, 10 * 60_000, user.id);
   if (limited) return limited;

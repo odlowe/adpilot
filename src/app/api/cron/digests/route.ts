@@ -36,6 +36,10 @@ export async function GET(request: Request) {
       (prefs.digestFrequency === "monthly" && isFirstOfMonth);
     if (!due) continue;
 
+    // The numbers now cover exactly the period the subject line promises.
+    const windowDays =
+      prefs.digestFrequency === "daily" ? 1 : prefs.digestFrequency === "weekly" ? 7 : 30;
+
     const periodLabel =
       prefs.digestFrequency === "daily"
         ? "today"
@@ -51,7 +55,7 @@ export async function GET(request: Request) {
     for (const business of businesses) {
       const businessCampaigns = campaigns.filter((c) => c.businessId === business.id);
       if (businessCampaigns.length === 0) continue;
-      const metrics = aggregateMetrics(businessCampaigns.map(metricsForCampaign));
+      const metrics = aggregateMetrics(businessCampaigns.map((c) => metricsForCampaign(c, windowDays)));
       try {
       await sendCampaignDigest({
         dashboardUrl: `${new URL(request.url).origin}/dashboard`,

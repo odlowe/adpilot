@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verificationGate } from "@/lib/verification-gate";
 import { cleanCreatives } from "@/lib/creative-validate";
 import { getCurrentUser } from "@/lib/auth";
 import { createCampaign, getBusinessById, listCampaignsByUser } from "@/lib/db";
@@ -24,6 +25,9 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Please log in first." }, { status: 401 });
   }
+
+  const unverified = verificationGate(user);
+  if (unverified) return unverified;
   return NextResponse.json({ campaigns: await listCampaignsByUser(user.id) });
 }
 
