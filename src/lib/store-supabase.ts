@@ -342,7 +342,21 @@ export async function listCampaignsByUser(userId: string): Promise<Campaign[]> {
 export async function updateCampaign(
   id: string,
   userId: string,
-  patch: Partial<Pick<Campaign, "name" | "budget" | "zip" | "durationMonths" | "continuous">>
+  patch: Partial<
+    Pick<
+      Campaign,
+      | "name"
+      | "budget"
+      | "zip"
+      | "durationMonths"
+      | "continuous"
+      | "manualMode"
+      | "platformSplit"
+      | "siteCategories"
+      | "customSites"
+      | "targetingJson"
+    >
+  >
 ): Promise<Campaign | null> {
   const rowPatch: Record<string, unknown> = {};
   if (patch.name !== undefined) rowPatch.name = patch.name;
@@ -350,6 +364,11 @@ export async function updateCampaign(
   if (patch.zip !== undefined) rowPatch.zip = patch.zip;
   if (patch.durationMonths !== undefined) rowPatch.duration_months = patch.durationMonths;
   if (patch.continuous !== undefined) rowPatch.continuous = patch.continuous;
+  if (patch.manualMode !== undefined) rowPatch.manual_mode = patch.manualMode;
+  if (patch.platformSplit !== undefined) rowPatch.platform_split = patch.platformSplit;
+  if (patch.siteCategories !== undefined) rowPatch.site_categories = patch.siteCategories;
+  if (patch.customSites !== undefined) rowPatch.custom_sites = patch.customSites;
+  if (patch.targetingJson !== undefined) rowPatch.targeting_json = patch.targetingJson;
 
   const { data: row, error } = await db()
     .from("campaigns")

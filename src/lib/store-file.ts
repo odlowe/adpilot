@@ -231,7 +231,21 @@ export async function listCampaignsByUser(userId: string): Promise<Campaign[]> {
 export async function updateCampaign(
   id: string,
   userId: string,
-  patch: Partial<Pick<Campaign, "name" | "budget" | "zip" | "durationMonths" | "continuous">>
+  patch: Partial<
+    Pick<
+      Campaign,
+      | "name"
+      | "budget"
+      | "zip"
+      | "durationMonths"
+      | "continuous"
+      | "manualMode"
+      | "platformSplit"
+      | "siteCategories"
+      | "customSites"
+      | "targetingJson"
+    >
+  >
 ): Promise<Campaign | null> {
   const campaign = store.campaigns.get(id);
   if (!campaign || campaign.userId !== userId) return null;

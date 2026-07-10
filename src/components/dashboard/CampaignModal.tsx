@@ -19,7 +19,7 @@ import CreativeUploader from "./CreativeUploader";
 import Slider from "@/components/ui/Slider";
 import type { CampaignDraft, CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
 
-const SITE_CATEGORIES = [
+export const SITE_CATEGORIES = [
   "Local news sites",
   "Food & recipe blogs",
   "Parenting & family",

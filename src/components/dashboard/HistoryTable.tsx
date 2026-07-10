@@ -1,6 +1,8 @@
 "use client";
 
-import { Archive } from "lucide-react";
+import { Archive, BarChart3, Check, Loader2, Pencil, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { metricsForCampaign, outcomeSummary } from "@/lib/metrics";
 import type { Campaign } from "@/lib/types";
 
@@ -10,8 +12,45 @@ const money = (n: number) =>
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-export default function HistoryTable({ campaigns }: { campaigns: Campaign[] }) {
+export default function HistoryTable({
+  campaigns,
+  onViewAnalytics,
+}: {
+  campaigns: Campaign[];
+  onViewAnalytics: (campaign: Campaign) => void;
+}) {
+  const router = useRouter();
   const completed = campaigns.filter((c) => c.status === "completed");
+
+  // inline rename state
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [savingRename, setSavingRename] = useState(false);
+
+  function startRename(campaign: Campaign) {
+    setRenamingId(campaign.id);
+    setRenameValue(campaign.name);
+  }
+
+  async function saveRename(campaign: Campaign) {
+    const name = renameValue.trim();
+    if (name.length < 2 || name === campaign.name) {
+      setRenamingId(null);
+      return;
+    }
+    setSavingRename(true);
+    try {
+      await fetch(`/api/campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates: { name } }),
+      });
+      router.refresh();
+    } finally {
+      setSavingRename(false);
+      setRenamingId(null);
+    }
+  }
 
   if (completed.length === 0) {
     return (
@@ -28,22 +67,71 @@ export default function HistoryTable({ campaigns }: { campaigns: Campaign[] }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
               <th className="px-5 py-3.5">Campaign Name / Target</th>
               <th className="px-5 py-3.5">Date Range</th>
               <th className="px-5 py-3.5">Total Capital Spent</th>
               <th className="px-5 py-3.5">Final Outcome Summary</th>
+              <th className="px-5 py-3.5"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {completed.map((campaign) => {
               const metrics = metricsForCampaign(campaign);
+              const renaming = renamingId === campaign.id;
               return (
                 <tr key={campaign.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                   <td className="px-5 py-4">
-                    <p className="font-semibold text-navy-900">{campaign.name}</p>
+                    {renaming ? (
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void saveRename(campaign);
+                            }
+                            if (e.key === "Escape") setRenamingId(null);
+                          }}
+                          className="w-full max-w-[220px] rounded-lg border border-emerald-400 px-2.5 py-1.5 text-sm font-semibold text-navy-900 outline-none ring-4 ring-emerald-100"
+                          aria-label="New campaign name"
+                        />
+                        <button
+                          type="button"
+                          disabled={savingRename}
+                          onClick={() => void saveRename(campaign)}
+                          aria-label="Save name"
+                          className="rounded-md p-1.5 text-emerald-600 transition hover:bg-emerald-50"
+                        >
+                          {savingRename ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRenamingId(null)}
+                          aria-label="Cancel rename"
+                          className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ) : (
+                      <p className="flex items-center gap-1.5 font-semibold text-navy-900">
+                        {campaign.name}
+                        <button
+                          type="button"
+                          onClick={() => startRename(campaign)}
+                          aria-label={`Rename ${campaign.name}`}
+                          className="rounded-md p-1 text-slate-300 transition hover:bg-slate-100 hover:text-navy-900"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      </p>
+                    )}
                     <p className="mt-0.5 text-xs text-slate-400">
                       {campaign.targetingJson.radiusMiles} mile radius
                       {campaign.isSample && (
@@ -60,6 +148,16 @@ export default function HistoryTable({ campaigns }: { campaigns: Campaign[] }) {
                     {money(campaign.budget * campaign.durationMonths)}
                   </td>
                   <td className="px-5 py-4 font-medium text-emerald-700">{outcomeSummary(metrics)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onViewAnalytics(campaign)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700"
+                    >
+                      <BarChart3 size={14} />
+                      View analytics
+                    </button>
+                  </td>
                 </tr>
               );
             })}

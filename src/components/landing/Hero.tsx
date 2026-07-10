@@ -28,13 +28,13 @@ export default function Hero() {
               Three dials and one sentence. Your smart helper writes, targets,
               and runs your ads on Google, Instagram, and Reddit — all at once.
             </p>
-            <div className="mt-8">
+            <div className="mt-8 max-w-md">
               <HeroVideo />
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-sm text-slate-500">
+                <ShieldCheck size={15} className="shrink-0 text-emerald-600" />
+                No contracts. Pause anytime. Set up in under 5 minutes.
+              </p>
             </div>
-            <p className="mt-5 flex items-center gap-1.5 text-sm text-slate-500">
-              <ShieldCheck size={15} className="text-emerald-600" />
-              No contracts. Pause anytime. Set up in under 5 minutes.
-            </p>
           </div>
 
           {/* The Extreme Simplicity box */}

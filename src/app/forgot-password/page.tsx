@@ -3,6 +3,7 @@
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import Footer from "@/components/landing/Footer";
 import Logo from "@/components/Logo";
 
 export default function ForgotPasswordPage() {
@@ -36,7 +37,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-8 bg-slate-50 px-4 py-12">
+    <div className="flex min-h-screen flex-col bg-slate-50">
+    <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-12">
       <Logo />
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
         <h1 className="text-2xl font-extrabold tracking-tight text-navy-900">
@@ -94,5 +96,7 @@ export default function ForgotPasswordPage() {
         </Link>
       </div>
     </main>
+    <Footer />
+    </div>
   );
 }

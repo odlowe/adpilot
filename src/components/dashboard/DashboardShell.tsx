@@ -5,8 +5,10 @@ import {
   Building2,
   ChevronDown,
   History,
+  Loader2,
   LogOut,
   Megaphone,
+  PauseCircle,
   Pencil,
   Plus,
   Settings,
@@ -22,6 +24,7 @@ import CampaignModal from "./CampaignModal";
 import EditCampaignModal from "./EditCampaignModal";
 import HistoryTable from "./HistoryTable";
 import SettingsModal from "./SettingsModal";
+import Footer from "@/components/landing/Footer";
 import Logo from "@/components/Logo";
 import { DRAFT_STORAGE_KEY } from "@/components/landing/HeroConfigurator";
 import { metricsForCampaign } from "@/lib/metrics";
@@ -52,6 +55,11 @@ export default function DashboardShell({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analyticsCampaign, setAnalyticsCampaign] = useState<Campaign | null>(null);
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
+  /** Campaign waiting on the "editing pauses your ads" confirmation. */
+  const [confirmEdit, setConfirmEdit] = useState<Campaign | null>(null);
+  const [pausingForEdit, setPausingForEdit] = useState(false);
+  /** True when we paused a live campaign to edit it and owe it a resume. */
+  const [resumeAfterEdit, setResumeAfterEdit] = useState(false);
 
   // business modal: "create" or the business being edited
   const [bizModal, setBizModal] = useState<"create" | Business | null>(null);
@@ -81,12 +89,55 @@ export default function DashboardShell({
 
   const firstName = user.fullName.split(" ")[0] || user.fullName;
 
+  /** Pencil clicked: live campaigns need the pause warning first. */
+  function requestEdit(campaign: Campaign) {
+    if (campaign.status === "active") {
+      setConfirmEdit(campaign);
+    } else {
+      setResumeAfterEdit(false);
+      setEditCampaign(campaign);
+    }
+  }
+
+  /** Owner confirmed: pause the campaign, then open the editor. */
+  async function pauseAndEdit() {
+    if (!confirmEdit) return;
+    setPausingForEdit(true);
+    try {
+      await fetch(`/api/campaigns/${confirmEdit.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pause" }),
+      });
+      setResumeAfterEdit(true);
+      setEditCampaign(confirmEdit);
+      setConfirmEdit(null);
+    } finally {
+      setPausingForEdit(false);
+    }
+  }
+
+  /** Editor closed (saved or not): resume the campaign if we paused it. */
+  async function closeEdit() {
+    const campaign = editCampaign;
+    setEditCampaign(null);
+    if (campaign && resumeAfterEdit) {
+      setResumeAfterEdit(false);
+      await fetch(`/api/campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resume" }),
+      });
+    }
+    router.refresh();
+  }
+
   return (
     <div className="min-h-screen bg-slate-100">
       {/* top navigation */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <Logo href="/dashboard" />
+          <Logo />
 
           {/* business selector */}
           <div className="relative ml-2 sm:ml-6">
@@ -206,15 +257,19 @@ export default function DashboardShell({
               campaigns={businessCampaigns}
               onCreate={() => setCampaignModalOpen(true)}
               onViewAnalytics={setAnalyticsCampaign}
-              onEdit={setEditCampaign}
+              onEdit={requestEdit}
             />
           )}
           {tab === "analytics" && (
             <AnalyticsView key={selectedBusiness?.id} campaigns={businessCampaigns} />
           )}
-          {tab === "history" && <HistoryTable campaigns={businessCampaigns} />}
+          {tab === "history" && (
+            <HistoryTable campaigns={businessCampaigns} onViewAnalytics={setAnalyticsCampaign} />
+          )}
         </div>
       </main>
+
+      <Footer />
 
       {/* modals */}
       {campaignModalOpen && selectedBusiness && (
@@ -258,8 +313,48 @@ export default function DashboardShell({
         </div>
       )}
 
+      {confirmEdit && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-navy-950/60 p-4 backdrop-blur-sm sm:p-8">
+          <div className="mx-auto mt-16 w-full max-w-md rounded-2xl bg-white p-7 shadow-lift">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <PauseCircle size={20} className="text-amber-600" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-navy-900">Edit this campaign?</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                  Editing temporarily pauses{" "}
+                  <span className="font-semibold text-navy-900">{confirmEdit.name}</span> so your
+                  changes don&apos;t go out half-finished. It resumes automatically the moment
+                  you&apos;re done — money already spent stays spent.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={pausingForEdit}
+                onClick={() => setConfirmEdit(null)}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-navy-300 hover:text-navy-900 disabled:opacity-60"
+              >
+                Never mind
+              </button>
+              <button
+                type="button"
+                disabled={pausingForEdit}
+                onClick={() => void pauseAndEdit()}
+                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {pausingForEdit && <Loader2 size={15} className="animate-spin" />}
+                Pause &amp; edit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editCampaign && (
-        <EditCampaignModal campaign={editCampaign} onClose={() => setEditCampaign(null)} />
+        <EditCampaignModal campaign={editCampaign} onClose={() => void closeEdit()} />
       )}
 
       {bizModal && (

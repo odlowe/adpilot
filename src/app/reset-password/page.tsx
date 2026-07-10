@@ -4,6 +4,7 @@ import { Loader2, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import Footer from "@/components/landing/Footer";
 import Logo from "@/components/Logo";
 
 function ResetForm() {
@@ -85,11 +86,14 @@ function ResetForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-8 bg-slate-50 px-4 py-12">
-      <Logo />
-      <Suspense>
-        <ResetForm />
-      </Suspense>
-    </main>
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-12">
+        <Logo />
+        <Suspense>
+          <ResetForm />
+        </Suspense>
+      </main>
+      <Footer />
+    </div>
   );
 }
