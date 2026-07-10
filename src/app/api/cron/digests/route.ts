@@ -51,6 +51,7 @@ export async function GET(request: Request) {
       if (businessCampaigns.length === 0) continue;
       const metrics = aggregateMetrics(businessCampaigns.map(metricsForCampaign));
       await sendCampaignDigest({
+        dashboardUrl: `${new URL(request.url).origin}/dashboard`,
         to: user.email,
         businessName: business.name,
         periodLabel,

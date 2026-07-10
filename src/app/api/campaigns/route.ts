@@ -90,6 +90,7 @@ export async function POST(request: Request) {
   // Confirmation + receipt. Never let an email hiccup break the launch itself.
   try {
     await sendCampaignReceiptEmail({
+      dashboardUrl: `${new URL(request.url).origin}/dashboard`,
       to: user.email,
       ownerName: user.fullName,
       businessName: business.name,
