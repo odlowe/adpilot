@@ -62,8 +62,10 @@ src/lib/
   legal.ts        ToS/privacy copy for /terms and /privacy pages.
 
 src/app/          Landing (page.tsx), signup/login/forgot-password/
-                  reset-password, onboarding (2-step wizard), dashboard,
-                  terms, privacy, icon.svg, opengraph-image.tsx.
+                  reset-password, onboarding (3-step wizard: name → category
+                  → AI profile [description/address/phone/website], step 3
+                  skippable), dashboard, terms, privacy, icon.svg,
+                  opengraph-image.tsx.
   api/            auth/{signup,login,logout,forgot,reset}, account (PATCH
                   profile/billing/emailPrefs, DELETE account), businesses
                   (+[id] PATCH/DELETE), campaigns (+[id] PATCH: action
@@ -89,6 +91,7 @@ src/components/
                   AnalyticsView (all-time + include/exclude picker),
                   AnalyticsPanel (metric cards w/ tooltips), PerformanceChart
                   (hand-rolled SVG), HistoryTable, SettingsModal (account/
+                  businesses [list + completeness hint + edit via BusinessModal]/
                   billing/email digests/appearance + delete account + pw reset),
                   CreativeUploader (drag-drop, live preview, uploads when
                   onUploaded prop given).

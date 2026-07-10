@@ -34,18 +34,35 @@ export function isImageAiConfigured(): boolean {
 export async function generateAdImage(options: {
   prompt: string;
   businessName?: string;
+  businessCategory?: string;
+  businessDescription?: string;
   references: ReferenceImage[];
 }): Promise<{ bytes: Buffer; contentType: string }> {
-  const { prompt, businessName, references } = options;
+  const { prompt, businessName, businessCategory, businessDescription, references } = options;
+
+  // The invisible half of the prompt: a creative-director briefing that turns
+  // whatever the owner types into a modern, click-worthy ad. The owner's own
+  // words are quoted inside it as the creative request.
+  const businessLine = [
+    businessName ? `"${businessName}"` : "a local small business",
+    businessCategory ? `(${businessCategory})` : "",
+    businessDescription ? `— ${businessDescription.slice(0, 400)}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const instruction = [
-    "Create one photorealistic advertising photo for a local small business.",
-    businessName ? `The business is called "${businessName}".` : "",
-    `What the owner wants: ${prompt}`,
+    "You are an expert advertising creative director producing ONE finished, scroll-stopping digital advertisement image for a local small business.",
+    `The business: ${businessLine}.`,
+    `The owner's creative request: "${prompt}"`,
     references.length > 0
-      ? "Use the attached reference photo(s) for the real look of the business, products, or people — stay faithful to them."
+      ? "Reference photos of the real business/products/people are attached — stay faithful to how they actually look; the ad must feel authentic to this exact business."
       : "",
-    "Landscape orientation. Warm, inviting, professional quality. No watermarks, no logos of other brands, and do not add any text or lettering to the image.",
+    "Creative direction: photorealistic, professional commercial-photography quality — crisp focus, rich color, flattering natural light. Modern, thumb-stopping composition built for social feeds: one strong subject, bold contrast, shallow depth of field, a little clean negative space. Warm and inviting, like a beloved neighborhood spot you want to visit today.",
+    businessName
+      ? `The business name may appear naturally in the scene (storefront signage or one short, clean line of type) — if any text appears it must be spelled exactly "${businessName}" and nothing else.`
+      : "Do not add any text or lettering.",
+    "Never include watermarks, other brands' logos, or fake awards. Landscape orientation, standard 1200x628 ad format.",
   ]
     .filter(Boolean)
     .join(" ");

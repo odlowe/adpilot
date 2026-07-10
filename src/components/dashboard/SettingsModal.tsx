@@ -8,6 +8,8 @@ import {
   Loader2,
   Mail,
   Moon,
+  Pencil,
+  Store,
   Sun,
   UserRound,
   X,
@@ -16,12 +18,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { readError } from "@/lib/client";
-import type { DigestFrequency, SafeUser } from "@/lib/types";
+import type { Business, DigestFrequency, SafeUser } from "@/lib/types";
 
-type Tab = "account" | "billing" | "email" | "appearance";
+type Tab = "account" | "businesses" | "billing" | "email" | "appearance";
 
 const TABS: Array<{ key: Tab; label: string; icon: typeof UserRound }> = [
   { key: "account", label: "Account", icon: UserRound },
+  { key: "businesses", label: "Businesses", icon: Store },
   { key: "billing", label: "Billing", icon: CreditCard },
   { key: "email", label: "Email updates", icon: Mail },
   { key: "appearance", label: "Appearance", icon: Moon },
@@ -33,7 +36,18 @@ const FREQUENCIES: Array<{ value: DigestFrequency; label: string; blurb: string 
   { value: "monthly", label: "Monthly", blurb: "One tidy report at the start of each month." },
 ];
 
-export default function SettingsModal({ user, onClose }: { user: SafeUser; onClose: () => void }) {
+export default function SettingsModal({
+  user,
+  businesses,
+  onEditBusiness,
+  onClose,
+}: {
+  user: SafeUser;
+  businesses: Business[];
+  /** Opens the full business editor (the settings modal closes first). */
+  onEditBusiness: (business: Business) => void;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("account");
 
@@ -267,6 +281,54 @@ export default function SettingsModal({ user, onClose }: { user: SafeUser; onClo
                 </div>
               </div>
             </>
+          )}
+
+          {tab === "businesses" && (
+            <div>
+              <p className="text-sm font-semibold text-navy-900">Your businesses</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Your agent reads each profile when writing ads and designing visuals —
+                a filled-in description makes a real difference.
+              </p>
+              <ul className="mt-4 space-y-3">
+                {businesses.map((b) => {
+                  const complete = Boolean(b.description.trim() && b.address.trim());
+                  return (
+                    <li
+                      key={b.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-navy-900">{b.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">{b.category}</p>
+                        {complete ? (
+                          <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-700">
+                            <CheckCircle2 size={12} /> Profile complete
+                          </p>
+                        ) : (
+                          <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-600">
+                            <AlertTriangle size={12} /> Add a description &amp; address to improve your ads
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onEditBusiness(b)}
+                        className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-navy-400 hover:text-navy-900"
+                      >
+                        <Pencil size={13} />
+                        Edit
+                      </button>
+                    </li>
+                  );
+                })}
+                {businesses.length === 0 && (
+                  <li className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-400">
+                    No businesses yet.
+                  </li>
+                )}
+              </ul>
+            </div>
           )}
 
           {tab === "billing" && (

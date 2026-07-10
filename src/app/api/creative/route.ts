@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateAdTagline } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
+import { getBusinessById } from "@/lib/db";
 import { generateAdImage, isImageAiConfigured, type ReferenceImage } from "@/lib/imagegen";
 import { storeCreative } from "@/lib/storage";
 
@@ -39,10 +40,22 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { prompt?: string; businessName?: string; references?: ReferenceImage[] }
+    | { prompt?: string; businessId?: string; businessName?: string; references?: ReferenceImage[] }
     | null;
   const prompt = body?.prompt?.trim() ?? "";
-  const businessName = body?.businessName?.trim() || undefined;
+  let businessName = body?.businessName?.trim() || undefined;
+  let businessCategory: string | undefined;
+  let businessDescription: string | undefined;
+
+  // Pull the full business profile so the ad briefing knows who this is for.
+  if (body?.businessId) {
+    const business = await getBusinessById(body.businessId);
+    if (business && business.userId === user.id) {
+      businessName = business.name;
+      businessCategory = business.category;
+      businessDescription = business.description?.trim() || undefined;
+    }
+  }
 
   if (prompt.length < 4) {
     return NextResponse.json(
@@ -66,7 +79,7 @@ export async function POST(request: Request) {
   // Real AI photo when a Gemini key is configured.
   if (isImageAiConfigured()) {
     try {
-      const image = await generateAdImage({ prompt, businessName, references });
+      const image = await generateAdImage({ prompt, businessName, businessCategory, businessDescription, references });
       const ext = image.contentType.split("/")[1]?.split(";")[0] ?? "png";
       const stored = await storeCreative({
         bytes: image.bytes,
@@ -78,11 +91,12 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ url: stored.url, engine: "photo" }, { status: 201 });
     } catch (err) {
-      console.warn("[creative] Gemini image failed:", err instanceof Error ? err.message : err);
-      return NextResponse.json(
-        { error: "The image generator hit a snag — try again, or reword the description." },
-        { status: 502 }
-      );
+      const detail = err instanceof Error ? err.message : "";
+      console.warn("[creative] Gemini image failed:", detail || err);
+      const friendly = detail.includes("429")
+        ? "Google's image service is out of quota — the free allowance is very small. Enable billing on the Google AI account (aistudio.google.com) or wait for the daily reset."
+        : "The image generator hit a snag — try again, or reword the description.";
+      return NextResponse.json({ error: friendly }, { status: 502 });
     }
   }
 

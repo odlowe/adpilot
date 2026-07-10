@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { createBusiness } from "@/lib/db";
+import { createBusiness, updateBusiness } from "@/lib/db";
 import type { BusinessCategory } from "@/lib/types";
 
 const CATEGORIES: BusinessCategory[] = [
@@ -11,7 +11,8 @@ const CATEGORIES: BusinessCategory[] = [
   "Other",
 ];
 
-/** Completes the 2-step wizard: creates the user's first business. */
+/** Completes the signup wizard: creates the user's first business (and its
+ * AI profile, when the owner didn't skip that step). */
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
@@ -19,7 +20,14 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { businessName?: string; category?: string }
+    | {
+        businessName?: string;
+        category?: string;
+        description?: string;
+        address?: string;
+        phone?: string;
+        website?: string;
+      }
     | null;
 
   const name = body?.businessName?.trim() || "My Business";
@@ -27,6 +35,25 @@ export async function POST(request: Request) {
     ? (body?.category as BusinessCategory)
     : "Other";
 
-  const business = await createBusiness({ userId: user.id, name, category });
+  let business = await createBusiness({ userId: user.id, name, category });
+
+  // Profile step (skippable): whatever they shared feeds the AI from day one.
+  const profile: Record<string, string> = {};
+  if (typeof body?.description === "string" && body.description.trim()) {
+    profile.description = body.description.trim().slice(0, 2000);
+  }
+  if (typeof body?.address === "string" && body.address.trim()) {
+    profile.address = body.address.trim().slice(0, 300);
+  }
+  if (typeof body?.phone === "string" && body.phone.trim()) {
+    profile.phone = body.phone.trim().slice(0, 50);
+  }
+  if (typeof body?.website === "string" && body.website.trim()) {
+    profile.website = body.website.trim().slice(0, 300);
+  }
+  if (Object.keys(profile).length > 0) {
+    business = (await updateBusiness(business.id, user.id, profile)) ?? business;
+  }
+
   return NextResponse.json({ business }, { status: 201 });
 }

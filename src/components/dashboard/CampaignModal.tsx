@@ -130,6 +130,7 @@ export default function CampaignModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: aiPrompt.trim(),
+          businessId,
           businessName,
           references: aiRefs.map(({ mimeType, data }) => ({ mimeType, data })),
         }),

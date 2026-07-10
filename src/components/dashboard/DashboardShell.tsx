@@ -285,7 +285,17 @@ export default function DashboardShell({
         />
       )}
 
-      {settingsOpen && <SettingsModal user={user} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsModal
+          user={user}
+          businesses={businesses}
+          onEditBusiness={(b) => {
+            setSettingsOpen(false);
+            setBizModal(b);
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
 
       {analyticsCampaign && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-navy-950/60 p-4 backdrop-blur-sm sm:p-8">
