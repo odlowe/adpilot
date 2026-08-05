@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSession, hashPassword, toSafeUser } from "@/lib/auth";
 import { createEmailVerificationToken, createUser, findUserByEmail } from "@/lib/db";
-import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email";
+import { sendVerificationEmail, sendWaitlistEmail, sendWelcomeEmail } from "@/lib/email";
+import { isWaitlisted } from "@/lib/waitlist";
 
 export async function POST(request: Request) {
   const limited = rateLimit(request, "signup", 5, 600000);
@@ -36,6 +37,17 @@ export async function POST(request: Request) {
   }
 
   const user = await createUser({ email, passwordHash: hashPassword(password), fullName });
+
+  // Doors-closed mode: the account is stored, but they wait outside for now.
+  if (isWaitlisted(email)) {
+    try {
+      await sendWaitlistEmail(user.email, user.fullName.split(" ")[0] || user.fullName);
+    } catch {
+      // The waitlist page still confirms their spot.
+    }
+    return NextResponse.json({ waitlisted: true }, { status: 201 });
+  }
+
   createSession(user.id);
 
   // Welcome + verification emails — never let an email hiccup break signup.

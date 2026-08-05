@@ -411,3 +411,31 @@ export async function sendVerificationEmail(to: string, firstName: string, verif
     }),
   });
 }
+
+/** Waitlist confirmation — sent instead of the welcome email while doors are closed. */
+export async function sendWaitlistEmail(to: string, firstName: string) {
+  return sendEmail({
+    to,
+    subject: `You're on the ${BRAND.name} waitlist, ${firstName}!`,
+    text: [
+      `Hi ${firstName},`,
+      "",
+      `Welcome to the ${BRAND.name} waitlist — your spot is saved.`,
+      "We're opening the doors to local businesses a few at a time so every single one gets a great experience. Your account details are stored and ready; the moment it's your turn, we'll email you and you can log right in.",
+      "",
+      `— ${BRAND.name}`,
+    ].join("\n"),
+    html: emailShell({
+      preheader: `Your spot on the ${BRAND.name} waitlist is saved.`,
+      contentHtml: [
+        heading("You're on the list!"),
+        paragraph(
+          `Hi ${escapeHtml(firstName)} — welcome to the ${BRAND.name} waitlist. Your spot is saved.`
+        ),
+        paragraph(
+          "We're opening the doors to local businesses a few at a time so every single one gets a great experience. Your account details are stored and ready — the moment it's your turn, we'll email you and you can log right in."
+        ),
+      ].join(""),
+    }),
+  });
+}

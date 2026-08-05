@@ -19,7 +19,7 @@
  */
 export const BRAND = {
   /** The product name shown everywhere. */
-  name: process.env.NEXT_PUBLIC_APP_NAME ?? "Campaign Strike",
+  name: process.env.NEXT_PUBLIC_APP_NAME ?? "CampaignStrike",
   /** Short slogan used in footers and email signatures. */
   tagline: "Made for main street",
   /** Footer "Contact us" mailbox. */
@@ -39,5 +39,9 @@ export function brandNameParts(): [string, string] {
   const name = BRAND.name;
   const space = name.lastIndexOf(" ");
   if (space > 0) return [name.slice(0, space + 1), name.slice(space + 1)];
+  // CamelCase wordmarks ("CampaignStrike") split at the last interior capital.
+  for (let i = name.length - 1; i > 0; i--) {
+    if (name[i] >= "A" && name[i] <= "Z") return [name.slice(0, i), name.slice(i)];
+  }
   return [name.slice(0, 2), name.slice(2)];
 }

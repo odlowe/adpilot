@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import { getCurrentUser } from "@/lib/auth";
 import { listBusinessesByUser, listCampaignsByUser } from "@/lib/db";
+import { isWaitlisted } from "@/lib/waitlist";
 
 export const metadata: Metadata = { title: `Dashboard — ${BRAND.name}` };
 
@@ -14,6 +15,7 @@ export default async function DashboardPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/dashboard");
+  if (isWaitlisted(user.email)) redirect("/waitlist");
 
   const [businesses, campaigns] = await Promise.all([
     listBusinessesByUser(user.id),

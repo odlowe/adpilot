@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSession, toSafeUser, verifyPassword } from "@/lib/auth";
 import { clearLoginFailures, findUserByEmail, recordLoginFailure } from "@/lib/db";
+import { isWaitlisted } from "@/lib/waitlist";
 
 export async function POST(request: Request) {
   const limited = rateLimit(request, "login", 15, 600000);
@@ -49,6 +50,12 @@ export async function POST(request: Request) {
   }
 
   await clearLoginFailures(user.id);
+
+  // Right password, doors still closed — back to the waitlist page.
+  if (isWaitlisted(user.email)) {
+    return NextResponse.json({ waitlisted: true });
+  }
+
   createSession(user.id);
   return NextResponse.json({ user: toSafeUser(user) });
 }

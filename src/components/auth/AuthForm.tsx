@@ -57,6 +57,11 @@ export default function AuthForm({ mode }: AuthFormProps) {
         setSubmitting(false);
         return;
       }
+      const data = (await res.json().catch(() => ({}))) as { waitlisted?: boolean };
+      if (data.waitlisted) {
+        router.push("/waitlist");
+        return;
+      }
       const next = searchParams.get("next");
       router.push(mode === "signup" ? "/onboarding" : next || "/dashboard");
       router.refresh();

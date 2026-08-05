@@ -264,6 +264,18 @@ frames — raw ad-manager-ready asset only. The 9:16 vertical format style
 mentions native story energy — watch whether that keeps tempting the model
 toward phone chrome; if UI artifacts persist, soften that line next.
 
+## Jul 10 (night) — wordmark, hero blank, WAITLIST MODE
+
+- Name is now "CampaignStrike" (no space); brandNameParts() splits camelCase
+  for the two-tone logo. Domain campaignstrike.com PURCHASED by Owen.
+- HeroVideo.tsx = blank navy aspect-video panel until Owen records the new
+  video (old <video> impl in git history).
+- WAITLIST MODE (lib/waitlist.ts, ON by default): only odlowe@gmail.com (+
+  WAITLIST_ALLOWED_EMAILS csv env) get sessions. Everyone else: account IS
+  created+stored, sendWaitlistEmail goes out, signup/login return
+  {waitlisted:true}, AuthForm routes to /waitlist page, dashboard bounces
+  stale waitlisted sessions. Open the doors later with WAITLIST_MODE=off.
+
 ## Working conventions with Owen
 
 - Batch requests arrive as long run-on lists — restate as a task list, build
