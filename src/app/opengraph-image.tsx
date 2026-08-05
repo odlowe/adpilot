@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { BRAND } from "@/lib/brand";
+import { BRAND, brandNameParts } from "@/lib/brand";
 
 /** The card shown when the site is shared in texts and social posts. */
 export const runtime = "edge";
@@ -39,8 +39,8 @@ export default function OpengraphImage() {
             ➤
           </div>
           <div style={{ fontSize: 44, fontWeight: 700 }}>
-            {BRAND.name.slice(0, 2)}
-            <span style={{ color: "#34d399" }}>{BRAND.name.slice(2)}</span>
+            {brandNameParts()[0]}
+            <span style={{ color: "#34d399" }}>{brandNameParts()[1]}</span>
           </div>
         </div>
         <div style={{ marginTop: 48, fontSize: 76, fontWeight: 800, lineHeight: 1.1 }}>

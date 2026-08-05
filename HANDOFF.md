@@ -14,7 +14,7 @@ feature batches, and appreciates honest strategic pushback. Concise replies.
 
 ## The product
 
-**AdPilot** (working name — final name undecided, see "Open decisions") is an
+**Campaign Strike** (chosen Jul 10; was AdPilot — brand.ts holds the name, campaignstrike.com was TAKEN at decision time, alt TLD/domain still needed) is an
 AI marketing platform for non-technical small business owners. Core pitch:
 "Extreme Simplicity" — three dials (budget $250–5,000/mo, radius 1–50 mi,
 duration 1–6 mo or continuous), one plain-English description of the customer,

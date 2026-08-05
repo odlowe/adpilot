@@ -19,11 +19,25 @@
  */
 export const BRAND = {
   /** The product name shown everywhere. */
-  name: process.env.NEXT_PUBLIC_APP_NAME ?? "AdPilot",
+  name: process.env.NEXT_PUBLIC_APP_NAME ?? "Campaign Strike",
   /** Short slogan used in footers and email signatures. */
   tagline: "Made for main street",
   /** Footer "Contact us" mailbox. */
-  supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@adpilot.example",
-  /** Session cookie name — src/lib/auth.ts and src/middleware.ts both import this. */
+  supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@campaignstrike.example",
+  /** Session cookie name — src/lib/auth.ts and src/middleware.ts both import this.
+   * Deliberately NOT renamed with the brand: changing it signs every
+   * existing user out once. Invisible to users; rename only if ever needed. */
   cookieName: process.env.SESSION_COOKIE_NAME ?? "adpilot_session",
 } as const;
+
+/**
+ * Splits the name for the two-tone logo: "Campaign Strike" → ["Campaign ", "Strike"]
+ * (second word in emerald); single-word names fall back to a 2-letter split
+ * ("AdPilot" → ["Ad", "Pilot"]).
+ */
+export function brandNameParts(): [string, string] {
+  const name = BRAND.name;
+  const space = name.lastIndexOf(" ");
+  if (space > 0) return [name.slice(0, space + 1), name.slice(space + 1)];
+  return [name.slice(0, 2), name.slice(2)];
+}
