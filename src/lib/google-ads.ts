@@ -638,6 +638,28 @@ export async function publishCampaignToGoogle(
   return { campaignId, campaignResourceName: created, warnings };
 }
 
+/**
+ * Creates a fresh client account under the (test) manager via the API.
+ * API-born accounts arrive ENABLED — no signup wizard, no draft limbo —
+ * which sidesteps the CUSTOMER_NOT_ENABLED trap of UI-created accounts.
+ */
+export async function createClientAccountUnderManager(
+  managerCustomerId: string,
+  name: string
+): Promise<string> {
+  const cid = managerCustomerId.replace(/-/g, "");
+  const reply = (await googleAdsRequest(cid, ":createCustomerClient", {
+    customerClient: {
+      descriptiveName: name,
+      currencyCode: "USD",
+      timeZone: "America/Chicago",
+    },
+  })) as { resourceName?: string };
+  const id = reply.resourceName?.split("/").pop();
+  if (!id) throw new Error("Google created no account (empty reply).");
+  return id;
+}
+
 /** Flips a published campaign's status (ENABLED / PAUSED / REMOVED). */
 export async function setGoogleCampaignStatus(
   customerId: string,
