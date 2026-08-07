@@ -482,6 +482,10 @@ export async function publishCampaignToGoogle(
         advertisingChannelType: "PERFORMANCE_MAX",
         status: "PAUSED",
         campaignBudget: budgetRes,
+        // EU transparency law makes this field mandatory. CampaignStrike
+        // targets US locals only — even the Political Campaign category is
+        // US-election work, which is not "EU political advertising".
+        containsEuPoliticalAdvertising: "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
         ...bidding,
       },
     },
@@ -511,20 +515,28 @@ export async function publishCampaignToGoogle(
   });
 
   // 4) Assets (text, images, logo, CTA, video)
+  // Brand Guidelines note: on modern PMax campaigns the BUSINESS_NAME and
+  // LOGO assets link at the CAMPAIGN level, not inside the asset group.
   const assetRes = () => `customers/${cid}/assets/${nextTemp()}`;
   const links: Array<{ asset: string; fieldType: string }> = [];
+  const campaignLinks: Array<{ asset: string; fieldType: string }> = [];
 
-  const textAsset = (text: string, fieldType: string) => {
+  const textAsset = (text: string, fieldType: string, target: "group" | "campaign" = "group") => {
     const res = assetRes();
     ops.push({ assetOperation: { create: { resourceName: res, textAsset: { text } } } });
-    links.push({ asset: res, fieldType });
+    (target === "campaign" ? campaignLinks : links).push({ asset: res, fieldType });
   };
   g.headlines.forEach((h) => textAsset(h, "HEADLINE"));
   g.longHeadlines.forEach((h) => textAsset(h, "LONG_HEADLINE"));
   g.descriptions.forEach((d) => textAsset(d, "DESCRIPTION"));
-  textAsset(g.businessNameShort, "BUSINESS_NAME");
+  textAsset(g.businessNameShort, "BUSINESS_NAME", "campaign");
 
-  const imageAsset = async (url: string, fieldType: string, label: string): Promise<boolean> => {
+  const imageAsset = async (
+    url: string,
+    fieldType: string,
+    label: string,
+    target: "group" | "campaign" = "group"
+  ): Promise<boolean> => {
     const data = await imageAsBase64(url);
     if (!data) {
       warnings.push(`Couldn't load the ${label} image — skipped it.`);
@@ -536,7 +548,7 @@ export async function publishCampaignToGoogle(
         create: { resourceName: res, name: `${label} ${Math.abs(tempId)}`, imageAsset: { data } },
       },
     });
-    links.push({ asset: res, fieldType });
+    (target === "campaign" ? campaignLinks : links).push({ asset: res, fieldType });
     return true;
   };
   let haveLandscape = false;
@@ -547,7 +559,9 @@ export async function publishCampaignToGoogle(
   for (const url of g.imageUrls.square.slice(0, 5)) {
     haveSquare = (await imageAsset(url, "SQUARE_MARKETING_IMAGE", "square")) || haveSquare;
   }
-  const haveLogo = g.squareLogoUrl ? await imageAsset(g.squareLogoUrl, "LOGO", "logo") : false;
+  const haveLogo = g.squareLogoUrl
+    ? await imageAsset(g.squareLogoUrl, "LOGO", "logo", "campaign")
+    : false;
   if (!haveLandscape || !haveSquare || !haveLogo) {
     throw new Error(
       "Google requires a landscape image, a square image, and a logo — one of them couldn't be downloaded. " +
@@ -595,6 +609,14 @@ export async function publishCampaignToGoogle(
     ops.push({
       assetGroupAssetOperation: {
         create: { assetGroup: groupRes, asset: link.asset, fieldType: link.fieldType },
+      },
+    });
+  }
+  // Brand Guidelines assets (business name + logo) hang off the campaign.
+  for (const link of campaignLinks) {
+    ops.push({
+      campaignAssetOperation: {
+        create: { campaign: campaignRes, asset: link.asset, fieldType: link.fieldType },
       },
     });
   }
