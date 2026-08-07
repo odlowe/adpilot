@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBusinessById, listCampaignsByUser, updateCampaign, updateCampaignStatus } from "@/lib/db";
 
 // Editing the target customer re-runs the AI planner — allow model latency.
-export const maxDuration = 30;
+export const maxDuration = 60;
 import { cleanCreatives } from "@/lib/creative-validate";
 import { buildGoogleAdsPlan } from "@/lib/google-ads";
 import type { PlatformSplit } from "@/lib/types";
@@ -154,6 +154,7 @@ export async function PATCH(
 
         const plan = await generateCampaignPlan(enriched, effectiveBudget, effectiveRadius, {
           businessName: owned?.name,
+          category: owned?.category,
           goal: existing.googleAdsJson?.goal,
           paidForBy: existing.googleAdsJson?.paidForBy ?? undefined,
         });

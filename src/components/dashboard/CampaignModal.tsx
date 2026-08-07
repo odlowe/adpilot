@@ -1008,6 +1008,14 @@ export default function CampaignModal({
 
               {plan && (phase === "preview" || phase === "launching") && (
                 <div className="mt-6">
+                  {plan.engine === "builtin" && (
+                    <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                      <span className="font-bold">Heads up:</span> the AI writer didn&apos;t respond
+                      this time, so this draft came from the built-in backup — it&apos;s serviceable,
+                      not brilliant. Hit <span className="font-semibold">Regenerate Preview</span> to
+                      try the real writer again before launching.
+                    </p>
+                  )}
                   <CampaignPreview plan={plan} />
                   {plan.pmax && (
                     <GoogleAssetEditor

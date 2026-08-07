@@ -139,16 +139,18 @@ export function buildPmaxFromBasics(
     30,
     15
   );
+  // Complete sentences only — never the clipped "People within X miles..."
+  // audience blurb that used to leak in here and read like robot droppings.
   const longHeadlines = cleanList(
-    [...adCopy.headlines, targeting.audienceSummary],
+    [
+      ...adCopy.headlines.filter((h) => h.length <= 90),
+      `${businessName} is local, easy to reach, and run by people who remember you`,
+      `Skip the big chains — ${businessName} treats you like a regular from day one`,
+    ],
     90,
     5
   );
-  const descriptions = cleanList(
-    [...adCopy.descriptions, targeting.audienceSummary],
-    90,
-    5
-  );
+  const descriptions = cleanList(adCopy.descriptions, 90, 5);
   const productTerms = cleanList(
     targeting.googleKeywords.map((k) =>
       k.replace(/\s*(near me|open now|nearby)\s*/gi, " ").trim()

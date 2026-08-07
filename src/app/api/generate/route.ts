@@ -6,8 +6,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBusinessById } from "@/lib/db";
 import { CAMPAIGN_GOAL_KEYS, type CampaignGoal } from "@/lib/types";
 
-// Real model calls can take a while — allow up to 30s on Vercel.
-export const maxDuration = 30;
+// Real model calls can take a while — give the real writer every chance
+// before the backup steps in.
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     const business = await getBusinessById(body.businessId);
     if (business && business.userId === user.id) {
       opts.businessName = business.name;
+      opts.category = business.category;
       const profileBits = [business.description, business.address].filter(Boolean).join(". ");
       if (profileBits) intentText = `${intentText}. About the business: ${profileBits}`;
     }

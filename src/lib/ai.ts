@@ -18,6 +18,8 @@ export interface PlanOptions {
   goal?: CampaignGoal;
   /** Political Campaign category: the legally required disclaimer line. */
   paidForBy?: string;
+  /** Business category — "Political Campaign" activates candidate rules. */
+  category?: string;
 }
 
 const GOAL_DESCRIPTIONS: Record<CampaignGoal, string> = {
@@ -203,11 +205,63 @@ async function generateMockPlan(
   let pmax = buildPmaxFromBasics(adCopy, targeting, name);
   if (opts.paidForBy?.trim()) pmax = ensurePaidForBy(pmax, opts.paidForBy.trim());
 
+  return withPoliticalTerms(
+    {
+      engine: "builtin",
+      adCopy: withDisclaimer(adCopy, opts.paidForBy),
+      targeting,
+      estMonthlyReach,
+      pmax,
+    },
+    intentText,
+    opts
+  );
+}
+
+/**
+ * Owen's rule, guaranteed in code: political campaigns always get the
+ * candidate/committee name as a search term, plus name + district when a
+ * district number appears anywhere in the input. The prompt asks the AI to
+ * do this too — this makes it a certainty, whichever engine wrote the plan.
+ */
+function withPoliticalTerms(
+  plan: CampaignPlan,
+  intentText: string,
+  opts: PlanOptions
+): CampaignPlan {
+  const political = opts.category === "Political Campaign" || Boolean(opts.paidForBy?.trim());
+  const name = opts.businessName?.trim();
+  if (!political || !name || !plan.pmax) return plan;
+
+  const districtMatch = intentText.match(/district\s*#?\s*(\d+)/i);
+  const wardMatch = intentText.match(/ward\s*#?\s*(\d+)/i);
+  const extras = [
+    name,
+    ...(districtMatch ? [`${name} district ${districtMatch[1]}`] : []),
+    ...(wardMatch ? [`${name} ward ${wardMatch[1]}`] : []),
+  ];
+
+  const addMissing = (list: string[], additions: string[], max: number): string[] => {
+    const out = [...list];
+    for (const term of additions) {
+      if (!out.some((t) => t.toLowerCase() === term.toLowerCase())) {
+        if (out.length >= max) out.pop(); // make room — these terms are non-negotiable
+        out.unshift(term);
+      }
+    }
+    return out;
+  };
+
   return {
-    adCopy: withDisclaimer(adCopy, opts.paidForBy),
-    targeting,
-    estMonthlyReach,
-    pmax,
+    ...plan,
+    targeting: {
+      ...plan.targeting,
+      googleKeywords: addMissing(plan.targeting.googleKeywords, extras, 8),
+    },
+    pmax: {
+      ...plan.pmax,
+      searchThemes: addMissing(plan.pmax.searchThemes, extras, 12),
+    },
   };
 }
 
@@ -233,7 +287,9 @@ function withDisclaimer(
 // ---------------------------------------------------------------------------
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
-const ANTHROPIC_TIMEOUT_MS = 25_000;
+// Generous on purpose: a slow reply that arrives beats a silent fallback to
+// the backup writer. Routes that call this run with maxDuration 60.
+const ANTHROPIC_TIMEOUT_MS = 50_000;
 
 export function isAiConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -311,21 +367,49 @@ Respond with ONLY a valid JSON object — no markdown fences, no commentary — 
   },
   "estMonthlyReach": [low, high] — estimated monthly ad impressions for this budget, assuming roughly 35-60 impressions per dollar in local markets,
   "pmax": {
-    "searchThemes": [10-12 themes pulled straight from the profile's needs and moments — cover all four angles: urgent-problem searches, research/comparison searches, local-intent searches, and what-they-really-want searches (the outcome, not the product). Specific beats broad every time],
+    "searchThemes": [10-12 themes built with the SEARCH TERM FORMULA below],
     "productTerms": [4-8 short terms for exactly what is being sold or offered],
     "uniqueSellingPoints": [3-5 selling points, each under 60 characters, drawn from what makes THIS business special],
-    "headlines": [12-15 punchy ad headlines, EACH 30 CHARACTERS OR FEWER — count characters carefully, this is a hard platform limit. At least 4 must speak to the profile's specific desire or problem, not just name the business],
-    "longHeadlines": [5 longer headlines, each under 90 characters],
+    "headlines": [13-15 headlines built with the HEADLINE FORMULA below, EACH 30 CHARACTERS OR FEWER — count characters carefully, this is a hard platform limit],
+    "longHeadlines": [5 long headlines built with the LONG HEADLINE FORMULA below, each a COMPLETE sentence under 90 characters],
     "descriptions": [5 ad descriptions, each under 90 characters],
     "businessNameShort": the business name in 25 characters or fewer
   }
 }
 
-The "pmax" block is the Google Performance Max asset group — respect every character limit exactly; assets over the limit get truncated and read badly.
-Google's ad policy REJECTS assets containing quotation marks, repeated punctuation (!!, ??, ...), or gimmicky symbols — never use them in any pmax field.
-The quality bar: a keyword or theme is only good if you can point at the sentence in audienceProfile that produced it. Never pad lists with generic terms to hit a count.
-Ground everything in the actual business described. If a business name appears, weave it into headlines naturally.
-If the request mentions a required "Paid for by ..." political disclaimer, one pmax description and one adCopy description must end with that exact line.`;
+HEADLINE FORMULA — build the 13-15 headlines as a deliberate portfolio, roughly:
+- 2 brand: the business name, and name + what it is ("Hartley Plumbing Co", "Hartley — Local Plumbers")
+- 3 benefit: the outcome the profile says they want, stated plainly ("Hot Water Back By Tonight")
+- 2 problem callouts in the customer's own words ("Drain Backing Up Again?")
+- 2 local trust: place + credibility ("Springfield's Go-To Plumber")
+- 2 action/next-step tied to the campaign goal ("Call For Same-Day Help")
+- 2 proof/identity pulled from real facts in the input ("Family-Run Since 2009")
+- 2 wildcards that only make sense for THIS business — the ones a template could never write
+Vary first words (no two headlines start with the same word), vary lengths (some 15-20 chars, some 26-30), and write like a sharp local — not like ad-speak.
+
+LONG HEADLINE FORMULA — 5 complete sentences, one each:
+1. Benefit + what makes them different: "Get X without Y, from the only Z in town that ..."
+2. Local trust: who in the area already relies on them and why
+3. Problem → relief: name the frustration, then the fix
+4. What actually happens when you click/visit/call — set the expectation
+5. Identity: "For people who ..." — let the right customer recognize themselves
+NEVER truncate a sentence to fit — write a SHORTER complete sentence instead. Never start with "People within X miles".
+
+SEARCH TERM FORMULA — for googleKeywords AND searchThemes, build tiers:
+- urgent/problem tier: what they type when it's going wrong right now
+- service+place tier: the service with the town/neighborhood/zip area from the input
+- comparison tier: "best", "reviews", "cost/prices" versions
+- outcome tier: the thing they really want, not the product name
+- brand tier: the business name itself (people who heard of them will search it)
+POLITICAL CAMPAIGNS (category or disclaimer says so): the candidate's NAME is always one search term and one theme; the name + district/office ("jane smith district 7", "jane smith city council") is always another; add issue-based terms voters in that race would search.
+
+HARD RULES:
+- NEVER invent facts: no discounts, prices, years in business, awards, "licensed", "#1", or claims that are not in the input. If the input gives none, lean on location, service, and tone instead.
+- The "pmax" block is the Google Performance Max asset group — respect every character limit exactly; assets over the limit get truncated and read badly.
+- Google's ad policy REJECTS assets containing quotation marks, repeated punctuation (!!, ??, ...), or gimmicky symbols — never use them in any pmax field.
+- A keyword or theme is only good if you can point at the sentence in audienceProfile that produced it. Never pad lists with generic terms to hit a count.
+- Ground everything in the actual business described. If a business name appears, weave it into headlines naturally.
+- If the request mentions a required "Paid for by ..." political disclaimer, one pmax description and one adCopy description must end with that exact line.`;
 
 /** Validates and tidies whatever the model returned into a strict CampaignPlan. */
 function coercePlan(raw: unknown, budget: number, radiusMiles: number): CampaignPlan {
@@ -408,10 +492,11 @@ export async function generateCampaignPlan(
       `Monthly budget: $${budget}`,
       `Radius: ${radiusMiles} miles`,
       ...(opts.businessName ? [`Business name: ${opts.businessName}`] : []),
+      ...(opts.category ? [`Business category: ${opts.category}`] : []),
       ...(opts.goal ? [`Campaign goal: ${GOAL_DESCRIPTIONS[opts.goal]}`] : []),
       ...(opts.paidForBy?.trim()
         ? [
-            `This is a POLITICAL campaign. Required disclaimer that must appear: "Paid for by ${opts.paidForBy.trim()}"`,
+            `This is a POLITICAL campaign. Required disclaimer that must appear: "Paid for by ${opts.paidForBy.trim()}". Apply the political search-term rules.`,
           ]
         : []),
     ];
@@ -429,7 +514,11 @@ export async function generateCampaignPlan(
         opts.businessName?.trim() || pickBusinessName(intentText)
       );
     if (opts.paidForBy?.trim()) pmax = ensurePaidForBy(pmax, opts.paidForBy.trim());
-    return { ...plan, adCopy: withDisclaimer(plan.adCopy, opts.paidForBy), pmax };
+    return withPoliticalTerms(
+      { ...plan, engine: "claude", adCopy: withDisclaimer(plan.adCopy, opts.paidForBy), pmax },
+      intentText,
+      opts
+    );
   } catch (err) {
     console.warn(
       "[ai] Claude call failed — using built-in planner:",

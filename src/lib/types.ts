@@ -138,6 +138,10 @@ export interface GoogleAdsCampaignPlan {
 }
 
 export interface CampaignPlan {
+  /** Which writer produced this: the real AI or the built-in backup.
+   *  Surfaced in the preview so a silent fallback is never mistaken
+   *  for the AI's best work. */
+  engine?: "claude" | "builtin";
   /** The AI's expanded picture of the target customer — written FIRST so
    *  every keyword and theme is derived from it, not from thin air. */
   audienceProfile?: string;
