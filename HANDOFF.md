@@ -427,6 +427,19 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
 - v4 (business-creation timeout fix) was never uploaded — v5 zip is
   cumulative; Owen uploads v5 only.
 
+### Aug 7 (round 11) — 🎉 FIRST CAMPAIGN ON GOOGLE + account-tree diagnostic (v12)
+- **PUBLISH SUCCEEDED**: campaign 24110026254 ("Campaign Strike — Deal
+  seekers nearby") created PAUSED in test client 6768358139. The entire
+  pipeline works end to end. (One warning: no ZIP set → nationwide default.)
+- Owen couldn't FIND it in the UI (four lookalike accounts now exist: old
+  non-test manager 8502715176 + its draft child 7347346250 = decoys; real
+  test manager (id in Vercel LOGIN_CUSTOMER_ID) + API child 6768358139 =
+  the real ones). Added googleAdsSearch() (GAQL) + listClientAccounts() +
+  GET /api/google/accounts — prints the true account tree AND the campaigns
+  inside the publish target straight from the API.
+- NEXT SESSION: metrics/status sync via GAQL (googleAdsSearch is ready for
+  it), pause/resume wiring, Basic-access application walkthrough.
+
 ### Aug 7 (round 10) — ASPECT_RATIO_NOT_ALLOWED → sharp normalizer (v11)
 - Google enforces image ratios exactly: MARKETING_IMAGE must be 1.91:1 but
   Gemini generates 16:9 (and banner is 21:9). Fix: **first real dependency
