@@ -730,9 +730,9 @@ export async function googleAdsSearch(
   customerId: string,
   query: string
 ): Promise<Array<Record<string, unknown>>> {
+  // No pageSize: v23+ fixed it at 10,000 rows and rejects the field outright.
   const reply = (await googleAdsRequest(customerId.replace(/-/g, ""), "/googleAds:search", {
     query,
-    pageSize: 100,
   })) as { results?: Array<Record<string, unknown>> };
   return reply.results ?? [];
 }
