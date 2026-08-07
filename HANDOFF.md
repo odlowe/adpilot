@@ -386,6 +386,47 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
   or enum mismatches in the mutate payload are the likely failure mode;
   API version pinned v20 via GOOGLE_ADS_API_VERSION).
 
+### Aug 7 (round 4) — live-fire fixes during Owen's credential walkthrough
+- Owen COMPLETED the walkthrough: /api/google/status returns connected:true.
+  Accounts: test manager 8502715176 (login-customer-id), test client
+  7347346250 (publish target), original Jul manager 1809623886 (owns the
+  dev token). Client secret was rotated (first one leaked into chat).
+  OAuth consent published to production ("Audience" tab in new console UI).
+- **v20 SUNSET**: Google killed API v20 Jun 10 2026 → every call 400'd.
+  Fixed via GOOGLE_ADS_API_VERSION=v23 env var (set in Vercel) + code
+  default now v23. Versions sunset yearly — check skuanalyzer.com/guides/
+  google-ads-api/version-updates or Google's blog when calls suddenly 400.
+- **Business creation timeout**: seeding 3 sample campaigns × real Claude
+  calls blew Vercel's function limit → "stuck loading". samples.ts now uses
+  exported generateBuiltInPlan (the deterministic mock — samples are
+  decoration) + maxDuration 30 on businesses/onboarding POST routes.
+- Error truncation in google-ads.ts widened 300→1200 chars (a 400's
+  errorCode got cut off mid-diagnosis).
+- NEXT: Owen pushes first test campaign via the card button; expect to
+  debug v23 payload nits from Google's (now fuller) error messages.
+
+### Aug 7 (round 5) — Owen's quality batch (pre-first-push)
+- **Audience-profile-first planning**: PLAN_SYSTEM_PROMPT now demands an
+  "audienceProfile" field WRITTEN FIRST (who/needs/Google-moments/their
+  words); keywords must mix local-intent + problem-phrases + comparison
+  phrases with generic filler explicitly BANNED; searchThemes must cover
+  urgent/research/local/outcome angles; ≥4 pmax headlines speak to the
+  desire not the name. CampaignPlan.audienceProfile?: string (transient,
+  not stored on Campaign); shown in CampaignPreview under "Who it will
+  reach" as "How your agent sees them". max_tokens 2000→2800.
+- **ImageCropModal** (components/ui): reusable drag+zoom cropper, exports
+  at EXACT preset px (canvas scales small images up, big ones down).
+  BusinessModal: all brand images forced through it → 1200×1200 JPEG
+  (Google's square-logo rule); files queue one at a time.
+  CreativeUploader: photos (when storing) must pick a Google shape —
+  landscape 1200×628 / square 1200×1200 / story 1080×1920 / banner
+  1200×514 — before upload; videos skip the crop; landing-page
+  preview-only mode unchanged. onUploaded now passes (url, format) and
+  CampaignModal records the real format instead of "custom" (feeds
+  straight into googleAdsJson.imageUrls mapping).
+- v4 (business-creation timeout fix) was never uploaded — v5 zip is
+  cumulative; Owen uploads v5 only.
+
 **NOT built yet**: status/metrics sync via searchStream GAQL (dashboard still
 shows fake numbers), pause/resume wiring to Google, per-customer production
 accounts + Basic-access application (Owen applies after test publishing
