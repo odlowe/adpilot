@@ -11,6 +11,7 @@ const CATEGORIES = [
   "Retail/Boutique",
   "Fitness/Gym",
   "Professional Services",
+  "Political Campaign",
   "Other",
 ] as const;
 

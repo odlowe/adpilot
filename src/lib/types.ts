@@ -23,6 +23,7 @@ export type BusinessCategory =
   | "Retail/Boutique"
   | "Fitness/Gym"
   | "Professional Services"
+  | "Political Campaign"
   | "Other";
 
 export interface AdCopy {

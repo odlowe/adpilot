@@ -15,6 +15,8 @@ const SAMPLE_INTENTS: Record<BusinessCategory, string> = {
     "A neighborhood fitness studio, want to reach locals who want to get in shape with classes",
   "Professional Services":
     "A trusted local firm, want small business owners and families nearby who need expert help",
+  "Political Campaign":
+    "A local campaign for office, want to reach voters in the district who care about their community",
   Other:
     "A locally owned business, want to reach neighbors nearby who prefer to shop local",
 };

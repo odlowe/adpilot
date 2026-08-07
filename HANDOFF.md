@@ -276,6 +276,62 @@ toward phone chrome; if UI artifacts persist, soften that line next.
   {waitlisted:true}, AuthForm routes to /waitlist page, dashboard bounces
   stale waitlisted sessions. Open the doors later with WAITLIST_MODE=off.
 
+## GOOGLE ADS BUILD — Owen's 9-page blueprint (Jul 10, BUILD NEXT SESSION)
+
+Owen has a TEST-access developer token (in Vercel as
+GOOGLE_ADS_DEVELOPER_TOKEN — never in code). lib/google-ads.ts holds the
+adapter skeleton + full credential list. "Political Campaign" category added
+everywhere (see compliance note below).
+
+Owen documented Google's real PMax flow as 9 pages. Agreed mapping — each
+field lives in ONE of: [PROFILE] business profile, [WIZARD] campaign
+creation flow, [AI] auto-generated (reviewable), [AUTO] handled silently:
+
+P1 Business name/website/phone → [PROFILE] all exist already.
+P2 Linked accounts (Google Business Profile, YouTube, phone, mobile app) →
+   [PROFILE] add linkedAccountsJson {gbp?, youtube?, phone?, appUrl?} to
+   Business + UI section in BusinessModal. Optional fields.
+P3 Goal (purchases/lead form/phone calls/page views/brand awareness) →
+   [WIZARD] new first question, radio cards. Maps to plan.goal.
+P4 Search themes → [AI] from industryText + keywords (editable chips);
+   Locations → [WIZARD] existing zip+radius dials; Language → [AUTO] "en"
+   (env-able later).
+P5 Landing URL → [WIZARD] input, default business website; product terms +
+   USPs → [AI] Claude extracts from description/industryText, editable;
+   enhance-pages URLs → [WIZARD] optional multi-input.
+P6 ENTIRE asset group → [AI]: 15×30ch headlines, 5×90ch long headlines,
+   5×90ch descriptions (extend generateCampaignPlan schema), images from
+   creativesJson (landscape+square exist!), square logo from brandingJson
+   Logo, businessNameShort (25ch, AI truncates), videos (YouTube link from
+   P2), sitelinks from enhance-pages, CTA already in adCopy. Preview step
+   shows all with edit.
+P7 Bid strategy → [WIZARD] one friendly toggle: "most customers"
+   (maximize_conversions) vs "most value" (maximize_conversion_value) +
+   optional target cost input. Plain-English copy essential.
+P8 Budget → [WIZARD] existing budget dial. dailyBudget = monthly/30.4.
+P9 Pay → [AUTO] existing Stripe checkout. Google's "strategist call" upsell
+   → drop (not our product).
+
+Data model deltas needed: Business.linkedAccountsJson; Campaign.googleAdsJson
+(GoogleAdsCampaignPlan from lib/google-ads.ts) + google_campaign_id/
+google_status for sync. Schema ALTERs as usual.
+
+WHAT OWEN MUST CREATE (only he can — walk him through):
+1. Google Cloud project → OAuth client (Web) → CLIENT_ID/SECRET env vars.
+2. Google Ads TEST MANAGER account (ads.google.com/home/tools/manager-accounts
+   in test mode) + a test client account under it → LOGIN_CUSTOMER_ID.
+3. One-time OAuth consent → REFRESH_TOKEN (build a /api/google/connect route
+   or use OAuth playground).
+4. Later, for production: apply for Basic access on the developer token.
+
+POLITICAL CAMPAIGN COMPLIANCE (added category): Google requires election-ad
+advertiser VERIFICATION before political ads serve, restricts targeting, and
+US law requires "Paid for by ..." disclaimers. When the wizard sees category
+Political Campaign it must (a) collect a "Paid for by" line, (b) warn about
+Google verification lead time, (c) keep the disclaimer in generated copy.
+NOT built yet — do with the wizard. Gemini may also refuse politician
+likenesses in images; expect concept-card-style fallbacks for this category.
+
 ## Working conventions with Owen
 
 - Batch requests arrive as long run-on lists — restate as a task list, build

@@ -9,6 +9,7 @@ const CATEGORIES: BusinessCategory[] = [
   "Retail/Boutique",
   "Fitness/Gym",
   "Professional Services",
+  "Political Campaign",
   "Other",
 ];
 
