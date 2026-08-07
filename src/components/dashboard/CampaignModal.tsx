@@ -154,6 +154,8 @@ export default function CampaignModal({
   }
 
   const [creativeUrl, setCreativeUrl] = useState<string | null>(null);
+  // Which Google shape the owner cropped their uploaded photo to.
+  const [uploadFormat, setUploadFormat] = useState<CampaignCreative["format"]>("custom");
 
   // AI visual generator
   interface AiReference {
@@ -354,7 +356,7 @@ export default function CampaignModal({
           creativeUrl,
           creatives: [
             ...(creativeUrl && !aiCreatives.some((c) => c.url === creativeUrl)
-              ? [{ url: creativeUrl, format: "custom", createdAt: new Date().toISOString() }]
+              ? [{ url: creativeUrl, format: uploadFormat, createdAt: new Date().toISOString() }]
               : []),
             ...aiCreatives,
           ],
@@ -703,14 +705,16 @@ export default function CampaignModal({
                     Ad photo or video <span className="font-normal text-slate-400">(optional)</span>
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Best sizes: <span className="font-semibold text-slate-500">1200×628</span> feed
-                    &middot; <span className="font-semibold text-slate-500">1200×1200</span> square
-                    &middot; <span className="font-semibold text-slate-500">1080×1920</span> story
-                    &middot; <span className="font-semibold text-slate-500">1200×514</span> banner
-                    &mdash; JPG or PNG
+                    Any photo works — you&apos;ll fit it to a Google ad size (feed, square, story,
+                    or banner) in one quick crop step. Too big or too small is fine; we scale it.
                   </p>
                   <div className="mt-2">
-                    <CreativeUploader onUploaded={setCreativeUrl} />
+                    <CreativeUploader
+                      onUploaded={(url, format) => {
+                        setCreativeUrl(url);
+                        setUploadFormat(format ?? "custom");
+                      }}
+                    />
                   </div>
 
                   {/* ---- AI visual generator ---- */}

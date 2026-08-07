@@ -138,6 +138,9 @@ export interface GoogleAdsCampaignPlan {
 }
 
 export interface CampaignPlan {
+  /** The AI's expanded picture of the target customer — written FIRST so
+   *  every keyword and theme is derived from it, not from thin air. */
+  audienceProfile?: string;
   adCopy: AdCopy;
   targeting: Targeting;
   estMonthlyReach: [number, number];

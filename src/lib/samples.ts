@@ -3,7 +3,9 @@
  * is seeded with one live and two completed campaigns (flagged `isSample`)
  * so the analytics and history views demonstrate themselves.
  */
-import { generateCampaignPlan } from "./ai";
+// Built-in planner ON PURPOSE: sample campaigns are demo decoration, and the
+// real AI (3 calls in one request) blew past Vercel's time limit on create.
+import { generateBuiltInPlan } from "./ai";
 import type { Business, BusinessCategory, Campaign } from "./types";
 
 const SAMPLE_INTENTS: Record<BusinessCategory, string> = {
@@ -62,7 +64,9 @@ export async function buildSampleCampaigns(
 
   const campaigns: Array<Omit<Campaign, "id">> = [];
   for (const spec of specs) {
-    const plan = await generateCampaignPlan(intent, spec.budget, spec.radius);
+    const plan = await generateBuiltInPlan(intent, spec.budget, spec.radius, {
+      businessName: business.name,
+    });
     campaigns.push({
       userId: business.userId,
       businessId: business.id,

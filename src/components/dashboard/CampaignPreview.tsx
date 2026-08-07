@@ -57,6 +57,12 @@ export default function CampaignPreview({ plan }: { plan: CampaignPlan }) {
             <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-relaxed text-emerald-900">
               {targeting.audienceSummary}
             </p>
+            {plan.audienceProfile && (
+              <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                <span className="font-bold text-navy-900">How your agent sees them: </span>
+                {plan.audienceProfile}
+              </p>
+            )}
           </div>
           <ChipGroup
             icon={<Search size={15} />}

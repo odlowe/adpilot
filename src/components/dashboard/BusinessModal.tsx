@@ -2,8 +2,12 @@
 
 import { AlertTriangle, ImagePlus, Link2, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
+import ImageCropModal from "@/components/ui/ImageCropModal";
 import { readError } from "@/lib/client";
 import type { Business, BrandingImage, LinkedAccounts } from "@/lib/types";
+
+/** Google requires square logos — every brand image leaves here 1200×1200. */
+const BRAND_CROP = [{ key: "square", label: "Square", width: 1200, height: 1200 }];
 
 const CATEGORIES = [
   "Home Services",
@@ -67,23 +71,33 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
     }
   }
 
-  async function uploadBranding(files: FileList | null) {
+  // Picked files wait in line for the square-crop step, one at a time.
+  const [cropQueue, setCropQueue] = useState<File[]>([]);
+
+  function queueBranding(files: FileList | null) {
     if (!files || files.length === 0) return;
+    const room = Math.max(0, 8 - branding.length);
+    const images = Array.from(files)
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, room);
+    if (images.length > 0) setCropQueue((prev) => [...prev, ...images]);
+  }
+
+  async function uploadCropped(dataUrl: string, sourceName: string) {
+    setCropQueue((prev) => prev.slice(1));
     setUploadingBrand(true);
     setError(null);
     try {
-      for (const file of Array.from(files).slice(0, 8 - branding.length)) {
-        if (!file.type.startsWith("image/")) continue;
-        const form = new FormData();
-        form.append("file", file);
-        const res = await fetch("/api/upload", { method: "POST", body: form });
-        const data = (await res.json()) as { url?: string; error?: string };
-        if (res.ok && data.url) {
-          const label: BrandingImage["label"] = /logo/i.test(file.name) ? "Logo" : "Other";
-          setBranding((prev) => [...prev, { url: data.url as string, label }]);
-        } else {
-          setError(data.error ?? "One of the uploads failed.");
-        }
+      const blob = await (await fetch(dataUrl)).blob();
+      const form = new FormData();
+      form.append("file", new File([blob], "brand-square.jpg", { type: "image/jpeg" }));
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (res.ok && data.url) {
+        const label: BrandingImage["label"] = /logo/i.test(sourceName) ? "Logo" : "Other";
+        setBranding((prev) => [...prev, { url: data.url as string, label }]);
+      } else {
+        setError(data.error ?? "One of the uploads failed.");
       }
     } catch {
       setError("No connection — check your internet and try again.");
@@ -261,7 +275,7 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
             multiple
             className="hidden"
             onChange={(e) => {
-              void uploadBranding(e.target.files);
+              queueBranding(e.target.files);
               e.target.value = "";
             }}
           />
@@ -352,6 +366,17 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
           </button>
         )}
       </form>
+
+      {cropQueue.length > 0 && (
+        <ImageCropModal
+          key={`${cropQueue[0].name}-${cropQueue.length}`}
+          file={cropQueue[0]}
+          presets={BRAND_CROP}
+          title={/logo/i.test(cropQueue[0].name) ? "Crop your logo (square)" : "Crop to square"}
+          onDone={(dataUrl) => void uploadCropped(dataUrl, cropQueue[0].name)}
+          onCancel={() => setCropQueue((prev) => prev.slice(1))}
+        />
+      )}
     </div>
   );
 }

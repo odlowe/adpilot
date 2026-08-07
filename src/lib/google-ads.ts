@@ -31,7 +31,9 @@ import type {
 // re-exported here so google-ads-centric code can keep importing it from this file.
 export type { GoogleAdsCampaignPlan } from "./types";
 
-const API_VERSION = process.env.GOOGLE_ADS_API_VERSION ?? "v20";
+// Google sunsets each major version ~a year after release (v20 died Jun 2026).
+// When every call suddenly 400s, bump GOOGLE_ADS_API_VERSION in Vercel first.
+const API_VERSION = process.env.GOOGLE_ADS_API_VERSION ?? "v23";
 const BASE = `https://googleads.googleapis.com/${API_VERSION}`;
 
 export function isGoogleAdsConfigured(): boolean {
@@ -299,7 +301,7 @@ export async function googleAdsRequest(
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`Google Ads API ${res.status}: ${detail.slice(0, 500)}`);
+    throw new Error(`Google Ads API ${res.status}: ${detail.slice(0, 1200)}`);
   }
   return res.json();
 }
@@ -345,7 +347,7 @@ export async function exchangeCodeForRefreshToken(
     }),
   });
   if (!res.ok) {
-    throw new Error(`Google token exchange ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    throw new Error(`Google token exchange ${res.status}: ${(await res.text()).slice(0, 1200)}`);
   }
   const data = (await res.json()) as { refresh_token?: string };
   return data.refresh_token ?? null;
@@ -361,7 +363,7 @@ export async function listAccessibleCustomers(): Promise<string[]> {
     },
   });
   if (!res.ok) {
-    throw new Error(`listAccessibleCustomers ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    throw new Error(`listAccessibleCustomers ${res.status}: ${(await res.text()).slice(0, 1200)}`);
   }
   const data = (await res.json()) as { resourceNames?: string[] };
   return (data.resourceNames ?? []).map((r) => r.replace("customers/", ""));

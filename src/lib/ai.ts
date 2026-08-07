@@ -129,6 +129,20 @@ function pickBusinessName(intent: string): string {
   return match ? match[1] : "Your Business";
 }
 
+/**
+ * The instant, deterministic planner. Exported for sample/demo campaign
+ * seeding — decorative data must NEVER wait on (or pay for) real AI calls;
+ * three of them in one request was timing out business creation on Vercel.
+ */
+export async function generateBuiltInPlan(
+  intentText: string,
+  budget: number,
+  radiusMiles: number,
+  opts: PlanOptions = {}
+): Promise<CampaignPlan> {
+  return generateMockPlan(intentText, budget, radiusMiles, opts);
+}
+
 async function generateMockPlan(
   intentText: string,
   budget: number,
@@ -279,8 +293,9 @@ function stringList(value: unknown, min: number, max: number, label: string): st
 const PLAN_SYSTEM_PROMPT = `You are the campaign planner inside a local-advertising product for small business owners.
 Given a plain-English description of a business and its customers, a monthly budget (USD), and a radius (miles), design one hyper-local ad campaign.
 
-Respond with ONLY a valid JSON object — no markdown fences, no commentary — in exactly this shape:
+Respond with ONLY a valid JSON object — no markdown fences, no commentary — in exactly this shape, writing the fields IN THIS ORDER:
 {
+  "audienceProfile": "WRITE THIS FIRST — 4-6 sentences expanding the owner's short description into a vivid, specific picture of the target customer: who they are (age range, life situation, values), what problem or desire pushes them to act, the exact MOMENTS they would turn to Google (what just happened in their life or day), and the natural words they'd use. Every keyword, theme, and line of copy below must be derived from this profile.",
   "adCopy": {
     "headlines": [4 short ad headlines, each under 60 characters, warm and specific to THIS business — never generic filler],
     "descriptions": [3 ad descriptions, each 1-2 sentences, plain neighborly English, no hype words],
@@ -290,16 +305,16 @@ Respond with ONLY a valid JSON object — no markdown fences, no commentary — 
     "radiusMiles": the radius you were given (number),
     "audienceSummary": one sentence describing exactly who the ads will reach and why,
     "audienceLabel": 3-5 plain words naming the target demographic (e.g. "eco-minded local moms") — becomes the campaign's short name,
-    "googleKeywords": [4-6 search phrases real locals would type, mostly "... near me" style],
+    "googleKeywords": [6-8 searches THIS audience would actually type in the moments described in the profile. Mix three kinds: local intent ("emergency plumber springfield", "... near me"), problem phrases in the customer's own words ("water heater making noise", "dress for outdoor wedding"), and comparison/decision phrases ("best rated ...", "... prices"). BANNED: generic filler like "shops near me", "local business", "stores open now"],
     "metaInterests": [4-6 real Facebook/Instagram interest categories],
     "redditInterests": [3-5 subreddits formatted like "r/Coffee"; include "Local city subreddit" as one entry]
   },
   "estMonthlyReach": [low, high] — estimated monthly ad impressions for this budget, assuming roughly 35-60 impressions per dollar in local markets,
   "pmax": {
-    "searchThemes": [8-12 short search themes locals would use to find this kind of business],
+    "searchThemes": [10-12 themes pulled straight from the profile's needs and moments — cover all four angles: urgent-problem searches, research/comparison searches, local-intent searches, and what-they-really-want searches (the outcome, not the product). Specific beats broad every time],
     "productTerms": [4-8 short terms for exactly what is being sold or offered],
     "uniqueSellingPoints": [3-5 selling points, each under 60 characters, drawn from what makes THIS business special],
-    "headlines": [12-15 punchy ad headlines, EACH 30 CHARACTERS OR FEWER — count characters carefully, this is a hard platform limit],
+    "headlines": [12-15 punchy ad headlines, EACH 30 CHARACTERS OR FEWER — count characters carefully, this is a hard platform limit. At least 4 must speak to the profile's specific desire or problem, not just name the business],
     "longHeadlines": [5 longer headlines, each under 90 characters],
     "descriptions": [5 ad descriptions, each under 90 characters],
     "businessNameShort": the business name in 25 characters or fewer
@@ -307,12 +322,14 @@ Respond with ONLY a valid JSON object — no markdown fences, no commentary — 
 }
 
 The "pmax" block is the Google Performance Max asset group — respect every character limit exactly; assets over the limit get truncated and read badly.
+The quality bar: a keyword or theme is only good if you can point at the sentence in audienceProfile that produced it. Never pad lists with generic terms to hit a count.
 Ground everything in the actual business described. If a business name appears, weave it into headlines naturally.
 If the request mentions a required "Paid for by ..." political disclaimer, one pmax description and one adCopy description must end with that exact line.`;
 
 /** Validates and tidies whatever the model returned into a strict CampaignPlan. */
 function coercePlan(raw: unknown, budget: number, radiusMiles: number): CampaignPlan {
   const obj = raw as {
+    audienceProfile?: unknown;
     adCopy?: { headlines?: unknown; descriptions?: unknown; callToAction?: unknown };
     targeting?: {
       audienceSummary?: unknown;
@@ -350,6 +367,9 @@ function coercePlan(raw: unknown, budget: number, radiusMiles: number): Campaign
   }
 
   return {
+    ...(typeof obj.audienceProfile === "string" && obj.audienceProfile.trim()
+      ? { audienceProfile: obj.audienceProfile.trim().slice(0, 1500) }
+      : {}),
     adCopy: { headlines, descriptions, callToAction },
     targeting: {
       radiusMiles,
@@ -395,7 +415,7 @@ export async function generateCampaignPlan(
         : []),
     ];
     const plan = coercePlan(
-      parseJsonBlock(await askClaude(PLAN_SYSTEM_PROMPT, contextLines.join("\n"), 2000)),
+      parseJsonBlock(await askClaude(PLAN_SYSTEM_PROMPT, contextLines.join("\n"), 2800)),
       budget,
       radiusMiles
     );

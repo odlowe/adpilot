@@ -3,6 +3,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { createBusiness, updateBusiness } from "@/lib/db";
 import type { BusinessCategory } from "@/lib/types";
 
+// Creating a business also seeds sample campaigns — give it breathing room.
+export const maxDuration = 30;
+
 const CATEGORIES: BusinessCategory[] = [
   "Home Services",
   "Retail/Boutique",
