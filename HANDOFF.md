@@ -427,6 +427,15 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
 - v4 (business-creation timeout fix) was never uploaded — v5 zip is
   cumulative; Owen uploads v5 only.
 
+### Aug 7 (round 13) — Claude-or-nothing (v15)
+- OWEN'S RULE: with ANTHROPIC_API_KEY set, the backup writer NEVER runs.
+  generateCampaignPlan retries Claude twice (25s timeout each, fits the
+  60s route ceiling) and THROWS on total failure; /api/generate returns a
+  clean 502 ("try again"), campaigns/[id] PATCH fails the save rather than
+  rewriting with backup copy. Mock remains only for keyless dev (samples
+  use generateBuiltInPlan directly). plan.engine + the amber notice remain
+  as the dev-mode tell. Loading copy now says 10-30 seconds.
+
 ### Aug 7 (round 12) — headline formula system (v14)
 - Owen saw MOCK output in Google's UI ("People within 5 miles who match...",
   clipped sentences) — his live campaign was written by the BACKUP writer,
