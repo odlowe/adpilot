@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cleanBranding } from "@/lib/business-patch";
+import { cleanBranding, cleanLinkedAccounts } from "@/lib/business-patch";
 import { getCurrentUser } from "@/lib/auth";
 import { deleteBusiness, listBusinessesByUser, updateBusiness } from "@/lib/db";
 import type { BusinessCategory } from "@/lib/types";
@@ -54,6 +54,11 @@ export async function PATCH(
   if (typeof body.website === "string") patch.website = body.website.trim().slice(0, 200);
   if ((body as { brandingImages?: unknown }).brandingImages !== undefined) {
     patch.brandingJson = cleanBranding((body as { brandingImages?: unknown }).brandingImages);
+  }
+  if ((body as { linkedAccounts?: unknown }).linkedAccounts !== undefined) {
+    patch.linkedAccountsJson = cleanLinkedAccounts(
+      (body as { linkedAccounts?: unknown }).linkedAccounts
+    );
   }
 
   const business = await updateBusiness(params.id, user.id, patch);

@@ -168,6 +168,7 @@ export async function createBusiness(
     phone: "",
     website: "",
     brandingJson: [],
+    linkedAccountsJson: {},
     createdAt: new Date().toISOString(),
   };
   store.businesses.set(business.id, business);
@@ -182,7 +183,7 @@ export async function createBusiness(
 export async function updateBusiness(
   id: string,
   userId: string,
-  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website" | "brandingJson">>
+  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website" | "brandingJson" | "linkedAccountsJson">>
 ): Promise<Business | null> {
   const business = store.businesses.get(id);
   if (!business || business.userId !== userId) return null;
@@ -252,6 +253,9 @@ export async function updateCampaign(
       | "adCopyJson"
       | "creativeUrl"
       | "creativesJson"
+      | "googleAdsJson"
+      | "googleCampaignId"
+      | "googleStatus"
     >
   >
 ): Promise<Campaign | null> {

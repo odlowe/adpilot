@@ -2,25 +2,41 @@
 
 import {
   CheckCircle2,
+  ClipboardList,
   Gauge,
+  Globe,
   ImagePlus,
+  Landmark,
   Loader2,
   MapPin,
+  Megaphone,
+  MousePointerClick,
+  Phone,
   Plus,
   Rocket,
+  ShoppingBag,
   SlidersHorizontal,
   Sparkles,
   Timer,
+  TrendingUp,
   Wand2,
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import CampaignPreview from "./CampaignPreview";
 import CreativeUploader from "./CreativeUploader";
+import GoogleAssetEditor from "./GoogleAssetEditor";
 import Slider from "@/components/ui/Slider";
 import { readError, startCheckout } from "@/lib/client";
 import { CREATIVE_FORMATS, FORMAT_LABELS } from "@/lib/creative-formats";
-import type { CampaignCreative, CampaignDraft, CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
+import type {
+  CampaignCreative,
+  CampaignDraft,
+  CampaignGoal,
+  CampaignPlan,
+  Platform,
+  PlatformSplit,
+} from "@/lib/types";
 
 export const SITE_CATEGORIES = [
   "Local news sites",
@@ -41,6 +57,45 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   reddit: "Reddit Ads",
 };
 
+/** Google wizard page 3 — the goal question, in plain English. */
+const GOALS: Array<{
+  key: CampaignGoal;
+  label: string;
+  hint: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    key: "purchases",
+    label: "More sales",
+    hint: "People buying from you, in store or online",
+    icon: <ShoppingBag size={17} />,
+  },
+  {
+    key: "leads_form",
+    label: "More leads",
+    hint: "People sending their info through a form",
+    icon: <ClipboardList size={17} />,
+  },
+  {
+    key: "leads_calls",
+    label: "More phone calls",
+    hint: "People calling your business directly",
+    icon: <Phone size={17} />,
+  },
+  {
+    key: "page_views",
+    label: "More website visits",
+    hint: "More people landing on your site",
+    icon: <MousePointerClick size={17} />,
+  },
+  {
+    key: "brand_awareness",
+    label: "Get known locally",
+    hint: "Neighbors start recognizing your name",
+    icon: <Megaphone size={17} />,
+  },
+];
+
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -49,6 +104,10 @@ type Phase = "editing" | "generating" | "preview" | "launching" | "launched";
 interface CampaignModalProps {
   businessId: string;
   businessName: string;
+  /** Pre-fills "where clicks go" (Google wizard page 5). */
+  businessWebsite?: string;
+  /** "Political Campaign" switches on the compliance step. */
+  businessCategory?: string;
   initialDraft?: CampaignDraft | null;
   onClose: () => void;
   onLaunched: () => void;
@@ -58,6 +117,8 @@ interface CampaignModalProps {
 export default function CampaignModal({
   businessId,
   businessName,
+  businessWebsite,
+  businessCategory,
   initialDraft,
   onClose,
   onLaunched,
@@ -71,6 +132,26 @@ export default function CampaignModal({
   const [phase, setPhase] = useState<Phase>("editing");
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Google wizard answers
+  const [goal, setGoal] = useState<CampaignGoal>("purchases");
+  const [landingUrl, setLandingUrl] = useState(businessWebsite ?? "");
+  const [enhancePages, setEnhancePages] = useState<string[]>([]);
+  const [enhanceInput, setEnhanceInput] = useState("");
+  const [bidStrategy, setBidStrategy] = useState<
+    "maximize_conversions" | "maximize_conversion_value"
+  >("maximize_conversions");
+  const [targetCost, setTargetCost] = useState("");
+  const isPolitical = businessCategory === "Political Campaign";
+  const [paidForBy, setPaidForBy] = useState("");
+
+  function addEnhancePage() {
+    const page = enhanceInput.trim();
+    if (page && !enhancePages.includes(page) && enhancePages.length < 10) {
+      setEnhancePages((current) => [...current, page]);
+    }
+    setEnhanceInput("");
+  }
 
   const [creativeUrl, setCreativeUrl] = useState<string | null>(null);
 
@@ -224,7 +305,14 @@ export default function CampaignModal({
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intentText, budget, radiusMiles: radius, businessId }),
+        body: JSON.stringify({
+          intentText,
+          budget,
+          radiusMiles: radius,
+          businessId,
+          goal,
+          ...(isPolitical && paidForBy.trim() ? { paidForBy: paidForBy.trim() } : {}),
+        }),
       });
       if (!res.ok) {
         setError(await readError(res));
@@ -272,6 +360,14 @@ export default function CampaignModal({
           ],
           industryText: intentText,
           plan,
+          goal,
+          landingPageUrl: landingUrl.trim(),
+          enhancePageUrls: enhancePages,
+          bidStrategy,
+          ...(targetCost.trim() && Number(targetCost) > 0
+            ? { targetCpa: Number(targetCost) }
+            : {}),
+          ...(isPolitical ? { paidForBy: paidForBy.trim() } : {}),
         }),
       });
       if (!res.ok) {
@@ -343,7 +439,65 @@ export default function CampaignModal({
             </div>
           ) : (
             <>
-              <label className="text-sm font-semibold text-navy-900" htmlFor="modal-intent">
+              {/* ---- Goal (Google wizard page 3) ---- */}
+              <p className="text-sm font-semibold text-navy-900">
+                What should this campaign do for you?
+              </p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {GOALS.map((g) => (
+                  <button
+                    key={g.key}
+                    type="button"
+                    onClick={() => setGoal(g.key)}
+                    aria-pressed={goal === g.key}
+                    className={`rounded-xl border p-3 text-left transition ${
+                      goal === g.key
+                        ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                        : "border-slate-200 bg-white hover:border-emerald-300"
+                    }`}
+                  >
+                    <span
+                      className={`flex items-center gap-2 text-sm font-bold ${
+                        goal === g.key ? "text-emerald-800" : "text-navy-900"
+                      }`}
+                    >
+                      <span className={goal === g.key ? "text-emerald-600" : "text-slate-400"}>
+                        {g.icon}
+                      </span>
+                      {g.label}
+                    </span>
+                    <span className="mt-1 block text-xs leading-snug text-slate-500">{g.hint}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* ---- Political compliance (category-triggered) ---- */}
+              {isPolitical && (
+                <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                  <p className="flex items-center gap-2 text-sm font-bold text-amber-900">
+                    <Landmark size={15} /> Political ads have extra rules
+                  </p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-amber-800">
+                    U.S. law requires a &ldquo;Paid for by&rdquo; disclaimer on every political ad,
+                    and Google must verify you as an election advertiser before your ads can run —
+                    that verification usually takes several days, so start it early at{" "}
+                    <span className="font-semibold">google.com/adspolicy</span>.
+                  </p>
+                  <label className="mt-3 block text-xs font-bold text-amber-900" htmlFor="paid-for-by">
+                    Paid for by <span className="font-normal">(exactly as it should appear)</span>
+                  </label>
+                  <input
+                    id="paid-for-by"
+                    type="text"
+                    value={paidForBy}
+                    onChange={(e) => setPaidForBy(e.target.value)}
+                    placeholder="e.g., Friends of Jane Smith for City Council"
+                    className="mt-1.5 w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-amber-300 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                  />
+                </div>
+              )}
+
+              <label className="mt-6 block text-sm font-semibold text-navy-900" htmlFor="modal-intent">
                 Describe Your Target Customer in Plain English
               </label>
               <textarea
@@ -401,6 +555,136 @@ export default function CampaignModal({
                     />
                     Continuous / Ongoing — run month to month, pause anytime
                   </label>
+                </div>
+
+                {/* ---- Where clicks go (Google wizard page 5) ---- */}
+                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
+                    <Globe size={15} className="text-emerald-600" /> Where clicks should land
+                  </p>
+                  <input
+                    type="text"
+                    value={landingUrl}
+                    onChange={(e) => setLandingUrl(e.target.value)}
+                    placeholder="yourwebsite.com — where people go when they tap your ad"
+                    aria-label="Landing page"
+                    className="mt-3 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  />
+                  <p className="mt-2.5 text-xs font-semibold text-slate-500">
+                    Other pages worth showing off{" "}
+                    <span className="font-normal text-slate-400">
+                      (optional — menu, services, booking… they become links under your ad)
+                    </span>
+                  </p>
+                  <div className="mt-1.5 flex gap-2">
+                    <input
+                      type="text"
+                      value={enhanceInput}
+                      onChange={(e) => setEnhanceInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addEnhancePage();
+                        }
+                      }}
+                      placeholder="e.g., yourwebsite.com/menu — press Enter to add"
+                      className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={addEnhancePage}
+                      aria-label="Add page"
+                      className="shrink-0 rounded-xl border border-slate-300 px-3 text-slate-500 transition hover:border-emerald-500 hover:text-emerald-700"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                  {enhancePages.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      {enhancePages.map((page) => (
+                        <span
+                          key={page}
+                          className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          {page}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEnhancePages((current) => current.filter((p) => p !== page))
+                            }
+                            aria-label={`Remove ${page}`}
+                            className="text-slate-400 hover:text-navy-900"
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ---- Bidding, minus the jargon (Google wizard page 7) ---- */}
+                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <p className="flex items-center gap-2 text-sm font-bold text-navy-900">
+                    <TrendingUp size={15} className="text-emerald-600" /> How should your budget chase results?
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setBidStrategy("maximize_conversions")}
+                      aria-pressed={bidStrategy === "maximize_conversions"}
+                      className={`rounded-xl border p-3.5 text-left transition ${
+                        bidStrategy === "maximize_conversions"
+                          ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                          : "border-slate-200 hover:border-emerald-300"
+                      }`}
+                    >
+                      <span className="block text-sm font-bold text-navy-900">
+                        As many customers as possible
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        Best for most local businesses — every customer counts the same
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBidStrategy("maximize_conversion_value")}
+                      aria-pressed={bidStrategy === "maximize_conversion_value"}
+                      className={`rounded-xl border p-3.5 text-left transition ${
+                        bidStrategy === "maximize_conversion_value"
+                          ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                          : "border-slate-200 hover:border-emerald-300"
+                      }`}
+                    >
+                      <span className="block text-sm font-bold text-navy-900">
+                        The most valuable customers
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        Chases bigger purchases — good if some sales are worth much more
+                      </span>
+                    </button>
+                  </div>
+                  <label className="mt-3 block text-xs font-semibold text-slate-500" htmlFor="target-cost">
+                    Target cost per customer{" "}
+                    <span className="font-normal text-slate-400">
+                      (optional — leave blank and Google finds the best price)
+                    </span>
+                  </label>
+                  <div className="relative mt-1.5 w-40">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                      $
+                    </span>
+                    <input
+                      id="target-cost"
+                      type="number"
+                      min={1}
+                      max={10000}
+                      value={targetCost}
+                      onChange={(e) => setTargetCost(e.target.value)}
+                      placeholder="25"
+                      className="w-full rounded-xl border border-slate-300 py-2.5 pl-7 pr-3 text-sm outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -703,6 +987,13 @@ export default function CampaignModal({
               {plan && (phase === "preview" || phase === "launching") && (
                 <div className="mt-6">
                   <CampaignPreview plan={plan} />
+                  {plan.pmax && (
+                    <GoogleAssetEditor
+                      pmax={plan.pmax}
+                      disabled={phase === "launching"}
+                      onChange={(pmax) => setPlan((current) => (current ? { ...current, pmax } : current))}
+                    />
+                  )}
                 </div>
               )}
 
@@ -710,7 +1001,7 @@ export default function CampaignModal({
                 <button
                   type="button"
                   onClick={handleGenerate}
-                  disabled={busy || intentText.trim().length < 12}
+                  disabled={busy || intentText.trim().length < 12 || (isPolitical && paidForBy.trim().length < 3)}
                   className="flex items-center justify-center gap-2 rounded-xl bg-navy-900 px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Wand2 size={16} className="text-emerald-400" />

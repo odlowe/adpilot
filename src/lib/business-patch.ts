@@ -1,4 +1,4 @@
-import type { BrandingImage, Business } from "./types";
+import type { BrandingImage, Business, LinkedAccounts } from "./types";
 
 const LABELS: BrandingImage["label"][] = ["Logo", "Storefront", "Product/Work", "Other"];
 const MAX_BRANDING = 8;
@@ -26,12 +26,36 @@ export function cleanBranding(value: unknown): BrandingImage[] {
   return out;
 }
 
+/** Validates client-supplied linked accounts (GBP, YouTube, phone, app URL). */
+export function cleanLinkedAccounts(value: unknown): LinkedAccounts {
+  if (!value || typeof value !== "object") return {};
+  const o = value as Record<string, unknown>;
+  const take = (key: keyof LinkedAccounts, max: number): string | undefined => {
+    const v = o[key];
+    if (typeof v !== "string") return undefined;
+    const s = v.trim().slice(0, max);
+    return s || undefined;
+  };
+  const out: LinkedAccounts = {};
+  const gbp = take("gbp", 300);
+  const youtube = take("youtube", 300);
+  const phone = take("phone", 40);
+  const appUrl = take("appUrl", 300);
+  if (gbp) out.gbp = gbp;
+  if (youtube) out.youtube = youtube;
+  if (phone) out.phone = phone;
+  if (appUrl) out.appUrl = appUrl;
+  return out;
+}
+
 /** Builds a business profile patch from an untyped request body. */
 export function businessPatchFrom(body: unknown): Partial<
-  Pick<Business, "description" | "address" | "phone" | "website" | "brandingJson">
+  Pick<Business, "description" | "address" | "phone" | "website" | "brandingJson" | "linkedAccountsJson">
 > {
   const b = (body ?? {}) as Record<string, unknown>;
-  const patch: Partial<Pick<Business, "description" | "address" | "phone" | "website" | "brandingJson">> = {};
+  const patch: Partial<
+    Pick<Business, "description" | "address" | "phone" | "website" | "brandingJson" | "linkedAccountsJson">
+  > = {};
   if (typeof b.description === "string" && b.description.trim()) patch.description = b.description.trim().slice(0, 2000);
   if (typeof b.address === "string" && b.address.trim()) patch.address = b.address.trim().slice(0, 300);
   if (typeof b.phone === "string" && b.phone.trim()) patch.phone = b.phone.trim().slice(0, 40);
@@ -40,5 +64,7 @@ export function businessPatchFrom(body: unknown): Partial<
     const branding = cleanBranding(b.brandingImages);
     if (branding.length > 0) patch.brandingJson = branding;
   }
+  // Unlike branding, an empty object is a valid save (owner cleared the links).
+  if (b.linkedAccounts !== undefined) patch.linkedAccountsJson = cleanLinkedAccounts(b.linkedAccounts);
   return patch;
 }

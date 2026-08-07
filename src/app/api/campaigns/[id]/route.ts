@@ -6,6 +6,7 @@ import { getBusinessById, listCampaignsByUser, updateCampaign, updateCampaignSta
 // Editing the target customer re-runs the AI planner — allow model latency.
 export const maxDuration = 30;
 import { cleanCreatives } from "@/lib/creative-validate";
+import { buildGoogleAdsPlan } from "@/lib/google-ads";
 import type { PlatformSplit } from "@/lib/types";
 
 const ACTIONS = {
@@ -145,18 +146,45 @@ export async function PATCH(
 
         let enriched = effectiveIntent;
         const business = await getBusinessById(existing.businessId);
-        if (business && business.userId === user.id) {
-          const profileBits = [business.description, business.address].filter(Boolean).join(". ");
+        const owned = business && business.userId === user.id ? business : null;
+        if (owned) {
+          const profileBits = [owned.description, owned.address].filter(Boolean).join(". ");
           if (profileBits) enriched = `${enriched}. About the business: ${profileBits}`;
         }
 
-        const plan = await generateCampaignPlan(enriched, effectiveBudget, effectiveRadius);
+        const plan = await generateCampaignPlan(enriched, effectiveBudget, effectiveRadius, {
+          businessName: owned?.name,
+          goal: existing.googleAdsJson?.goal,
+          paidForBy: existing.googleAdsJson?.paidForBy ?? undefined,
+        });
         patch.adCopyJson = plan.adCopy;
         patch.targetingJson = {
           ...plan.targeting,
           radiusMiles: effectiveRadius,
           ...(keywordsEdited ? { googleKeywords: keywords } : {}),
         };
+
+        // The stored Google plan follows the rewrite: fresh assets, same
+        // wizard choices (goal, landing page, bidding, disclaimer).
+        if (owned && existing.googleAdsJson && plan.pmax) {
+          const g = existing.googleAdsJson;
+          patch.googleAdsJson = buildGoogleAdsPlan({
+            goal: g.goal,
+            landingPageUrl: g.landingPageUrl,
+            enhancePageUrls: g.enhancePageUrls,
+            bidStrategy: g.bidStrategy,
+            targetCpa: g.targetCpa,
+            monthlyBudget: effectiveBudget,
+            zip: (patch.zip as string | undefined) ?? existing.zip,
+            radiusMiles: effectiveRadius,
+            pmax: plan.pmax,
+            business: owned,
+            creatives:
+              (patch.creativesJson as typeof existing.creativesJson | undefined) ??
+              existing.creativesJson,
+            paidForBy: g.paidForBy,
+          });
+        }
       } else if (keywords !== undefined || radius !== undefined) {
         patch.targetingJson = {
           ...existing.targetingJson,

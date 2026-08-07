@@ -4,7 +4,15 @@ import { cleanCreatives } from "@/lib/creative-validate";
 import { getCurrentUser } from "@/lib/auth";
 import { createCampaign, getBusinessById, listCampaignsByUser } from "@/lib/db";
 import { sendCampaignReceiptEmail } from "@/lib/email";
-import type { CampaignPlan, Platform, PlatformSplit } from "@/lib/types";
+import { buildGoogleAdsPlan, buildPmaxFromBasics, sanitizePmax } from "@/lib/google-ads";
+import {
+  CAMPAIGN_GOAL_KEYS,
+  type CampaignGoal,
+  type CampaignPlan,
+  type GoogleAdsCampaignPlan,
+  type Platform,
+  type PlatformSplit,
+} from "@/lib/types";
 
 /** Normalize any three numbers into whole percentages summing to 100. */
 function normalizeSplit(input?: Partial<PlatformSplit>): PlatformSplit {
@@ -52,6 +60,13 @@ export async function POST(request: Request) {
         creatives?: unknown;
         industryText?: string;
         plan?: CampaignPlan;
+        // Google wizard answers
+        goal?: string;
+        landingPageUrl?: string;
+        enhancePageUrls?: unknown;
+        bidStrategy?: string;
+        targetCpa?: number;
+        paidForBy?: string;
       }
     | null;
 
@@ -68,12 +83,69 @@ export async function POST(request: Request) {
   }
 
   const summary = body.industryText.trim();
+  const budget = Math.min(5000, Math.max(250, Math.round(body.budget)));
+  const zip = body.zip?.trim().slice(0, 32) ?? "";
+  const creatives = cleanCreatives(body.creatives);
+
+  // ---- assemble the Google Performance Max plan from the wizard's answers ----
+  const goal: CampaignGoal = CAMPAIGN_GOAL_KEYS.includes(body.goal as CampaignGoal)
+    ? (body.goal as CampaignGoal)
+    : "purchases";
+  const bidStrategy: GoogleAdsCampaignPlan["bidStrategy"] =
+    body.bidStrategy === "maximize_conversion_value"
+      ? "maximize_conversion_value"
+      : "maximize_conversions";
+  const targetCpa =
+    typeof body.targetCpa === "number" && Number.isFinite(body.targetCpa) && body.targetCpa > 0
+      ? Math.min(10_000, body.targetCpa)
+      : undefined;
+  const enhancePageUrls = Array.isArray(body.enhancePageUrls)
+    ? body.enhancePageUrls
+        .filter((u): u is string => typeof u === "string")
+        .map((u) => u.trim().slice(0, 300))
+        .filter(Boolean)
+        .slice(0, 10)
+    : [];
+  const paidForBy =
+    business.category === "Political Campaign" && typeof body.paidForBy === "string"
+      ? body.paidForBy.trim().slice(0, 120) || null
+      : null;
+
+  // US election law: political ads must carry a "Paid for by" disclaimer.
+  if (business.category === "Political Campaign" && !paidForBy) {
+    return NextResponse.json(
+      { error: 'Political campaigns need a "Paid for by" line before they can launch.' },
+      { status: 400 }
+    );
+  }
+
+  // The preview editor may have tweaked the assets — sanitize what came back
+  // (char limits are Google's hard rules) and backfill if it's missing/broken.
+  const pmax =
+    sanitizePmax(body.plan.pmax) ??
+    buildPmaxFromBasics(body.plan.adCopy, body.plan.targeting, business.name);
+
+  const googleAdsJson = buildGoogleAdsPlan({
+    goal,
+    landingPageUrl: typeof body.landingPageUrl === "string" ? body.landingPageUrl.slice(0, 300) : "",
+    enhancePageUrls,
+    bidStrategy,
+    targetCpa,
+    monthlyBudget: budget,
+    zip,
+    radiusMiles: body.plan.targeting.radiusMiles,
+    pmax,
+    business,
+    creatives,
+    paidForBy,
+  });
+
   const campaign = await createCampaign({
     userId: user.id,
     businessId: business.id,
     name: `${business.name} — ${summary.slice(0, 44)}${summary.length > 44 ? "…" : ""}`,
-    budget: Math.min(5000, Math.max(250, Math.round(body.budget))),
-    zip: body.zip?.trim().slice(0, 32) ?? "",
+    budget,
+    zip,
     durationMonths: Math.min(6, Math.max(1, Math.round(body.durationMonths ?? 1))),
     continuous: Boolean(body.continuous),
     manualMode: Boolean(body.manualMode),
@@ -83,10 +155,8 @@ export async function POST(request: Request) {
     siteCategories: (body.siteCategories ?? []).map((s) => String(s).slice(0, 60)).slice(0, 20),
     customSites: (body.customSites ?? []).map((s) => String(s).slice(0, 120)).slice(0, 25),
     creativeUrl:
-      typeof body.creativeUrl === "string"
-        ? body.creativeUrl
-        : cleanCreatives(body.creatives)[0]?.url ?? null,
-    creativesJson: cleanCreatives(body.creatives),
+      typeof body.creativeUrl === "string" ? body.creativeUrl : creatives[0]?.url ?? null,
+    creativesJson: creatives,
     industryText: summary,
     targetingJson: body.plan.targeting,
     adCopyJson: body.plan.adCopy,
@@ -95,6 +165,9 @@ export async function POST(request: Request) {
     startDate: new Date().toISOString(),
     endDate: null,
     isSample: false,
+    googleAdsJson,
+    googleCampaignId: null,
+    googleStatus: null,
   });
 
   // Confirmation + receipt. Never let an email hiccup break the launch itself.

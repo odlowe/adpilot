@@ -88,6 +88,9 @@ export async function buildSampleCampaigns(
       startDate: spec.start,
       endDate: spec.end,
       isSample: true,
+      googleAdsJson: null,
+      googleCampaignId: null,
+      googleStatus: null,
       createdAt: spec.start,
     });
   }

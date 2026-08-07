@@ -61,6 +61,10 @@ export async function POST(
     startDate: new Date().toISOString(),
     endDate: null,
     isSample: false,
+    // Same Google plan, but it's a NEW campaign on Google's side — fresh ids.
+    googleAdsJson: source.googleAdsJson ? { ...source.googleAdsJson } : null,
+    googleCampaignId: null,
+    googleStatus: null,
   });
 
   return NextResponse.json({ campaign }, { status: 201 });

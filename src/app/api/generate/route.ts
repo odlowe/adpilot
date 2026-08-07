@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { verificationGate } from "@/lib/verification-gate";
 import { rateLimit } from "@/lib/ratelimit";
-import { generateCampaignPlan, isAiConfigured } from "@/lib/ai";
+import { generateCampaignPlan, isAiConfigured, type PlanOptions } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
 import { getBusinessById } from "@/lib/db";
+import { CAMPAIGN_GOAL_KEYS, type CampaignGoal } from "@/lib/types";
 
 // Real model calls can take a while — allow up to 30s on Vercel.
 export const maxDuration = 30;
@@ -21,15 +22,31 @@ export async function POST(request: Request) {
   if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as
-    | { intentText?: string; budget?: number; radiusMiles?: number; businessId?: string }
+    | {
+        intentText?: string;
+        budget?: number;
+        radiusMiles?: number;
+        businessId?: string;
+        goal?: string;
+        paidForBy?: string;
+      }
     | null;
 
   let intentText = body?.intentText?.trim() ?? "";
+  const opts: PlanOptions = {};
+
+  if (CAMPAIGN_GOAL_KEYS.includes(body?.goal as CampaignGoal)) {
+    opts.goal = body?.goal as CampaignGoal;
+  }
+  if (typeof body?.paidForBy === "string" && body.paidForBy.trim()) {
+    opts.paidForBy = body.paidForBy.trim().slice(0, 120);
+  }
 
   // Enrich with the business profile so the agent has more to go on.
   if (body?.businessId) {
     const business = await getBusinessById(body.businessId);
     if (business && business.userId === user.id) {
+      opts.businessName = business.name;
       const profileBits = [business.description, business.address].filter(Boolean).join(". ");
       if (profileBits) intentText = `${intentText}. About the business: ${profileBits}`;
     }
@@ -50,7 +67,7 @@ export async function POST(request: Request) {
     await new Promise((resolve) => setTimeout(resolve, 1400));
   }
 
-  const plan = await generateCampaignPlan(intentText, budget, radiusMiles);
+  const plan = await generateCampaignPlan(intentText, budget, radiusMiles, opts);
   return NextResponse.json({ plan });
 }
 

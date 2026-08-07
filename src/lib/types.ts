@@ -58,10 +58,89 @@ export interface BrandingImage {
   label: "Logo" | "Storefront" | "Product/Work" | "Other";
 }
 
+/** Page 3 of the Google wizard — what the owner wants the ads to achieve. */
+export type CampaignGoal =
+  | "purchases"
+  | "leads_form"
+  | "leads_calls"
+  | "page_views"
+  | "brand_awareness";
+
+export const CAMPAIGN_GOAL_KEYS: CampaignGoal[] = [
+  "purchases",
+  "leads_form",
+  "leads_calls",
+  "page_views",
+  "brand_awareness",
+];
+
+/** Optional accounts a business can link (Google wizard page 2). */
+export interface LinkedAccounts {
+  /** Google Business Profile URL (or Maps listing link). */
+  gbp?: string;
+  /** YouTube channel or video URL — becomes the PMax video asset. */
+  youtube?: string;
+  /** Verification/call-tracking phone (defaults to the business phone). */
+  phone?: string;
+  /** Mobile app store URL, if they have an app. */
+  appUrl?: string;
+}
+
+/**
+ * The AI-written Performance Max asset group (Google wizard pages 4-6).
+ * Char limits are Google's hard rules — enforced in code, not just prompts:
+ * headlines ≤30, longHeadlines/descriptions ≤90, businessNameShort ≤25.
+ */
+export interface PmaxAssets {
+  searchThemes: string[];
+  productTerms: string[];
+  uniqueSellingPoints: string[];
+  headlines: string[]; // up to 15 × 30 chars
+  longHeadlines: string[]; // up to 5 × 90 chars
+  descriptions: string[]; // up to 5 × 90 chars
+  businessNameShort: string; // ≤ 25 chars
+}
+
+/** Everything the wizard collects that Google's Performance Max needs. */
+export interface GoogleAdsCampaignPlan {
+  /** Page 3 — campaign goal. */
+  goal: CampaignGoal;
+  /** Page 4 — search themes + geo/language. */
+  searchThemes: string[]; // words/phrases people search
+  locations: string[]; // geo target names or radius spec
+  languageCode: string; // e.g. "en"
+  /** Page 5 — landing + positioning. */
+  landingPageUrl: string;
+  productTerms: string[]; // what's being advertised, short terms
+  uniqueSellingPoints: string[];
+  enhancePageUrls: string[]; // pages to pull/enhance assets from
+  /** Page 6 — the asset group (AI pre-fills all of it). */
+  headlines: string[]; // up to 15 × 30 chars
+  longHeadlines: string[]; // up to 5 × 90 chars
+  descriptions: string[]; // up to 5 × 90 chars
+  imageUrls: { landscape: string[]; square: string[] };
+  squareLogoUrl: string | null;
+  businessNameShort: string; // 25 chars
+  videoUrls: string[];
+  sitelinks: Array<{ text: string; url: string }>;
+  callToAction:
+    | "LEARN_MORE" | "GET_QUOTE" | "APPLY_NOW" | "SIGN_UP" | "CONTACT_US"
+    | "SUBSCRIBE" | "DOWNLOAD" | "BOOK_NOW" | "SHOP_NOW";
+  /** Page 7 — bidding. */
+  bidStrategy: "maximize_conversions" | "maximize_conversion_value";
+  targetCpa?: number; // dollars, optional
+  /** Page 8 — budget. */
+  dailyBudget: number; // dollars (monthly budget / 30.4)
+  /** Political Campaign category only — US-law "Paid for by ..." line. */
+  paidForBy?: string | null;
+}
+
 export interface CampaignPlan {
   adCopy: AdCopy;
   targeting: Targeting;
   estMonthlyReach: [number, number];
+  /** Google PMax asset group — present on every newly generated plan. */
+  pmax?: PmaxAssets;
 }
 
 export interface BillingInfo {
@@ -107,6 +186,8 @@ export interface Business {
   website: string;
   /** Brand assets fed to the AI when generating ad visuals. */
   brandingJson: BrandingImage[];
+  /** Optional linked accounts (Google Business Profile, YouTube…). */
+  linkedAccountsJson: LinkedAccounts;
   createdAt: string;
 }
 
@@ -139,6 +220,12 @@ export interface Campaign {
   startDate: string;
   endDate: string | null;
   isSample: boolean;
+  /** The full Google Performance Max plan assembled at launch (null = pre-Google-era campaign). */
+  googleAdsJson: GoogleAdsCampaignPlan | null;
+  /** Google's campaign id once actually published via the API. */
+  googleCampaignId: string | null;
+  /** Google-side status once published (enabled/paused/removed…). */
+  googleStatus: string | null;
   createdAt: string;
 }
 

@@ -354,6 +354,8 @@ export default function DashboardShell({
         <CampaignModal
           businessId={selectedBusiness.id}
           businessName={selectedBusiness.name}
+          businessWebsite={selectedBusiness.website}
+          businessCategory={selectedBusiness.category}
           initialDraft={draft}
           onClose={() => {
             setCampaignModalOpen(false);

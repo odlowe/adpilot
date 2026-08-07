@@ -7,7 +7,34 @@
  *      no key, and as the safety net if the API call ever fails mid-demo,
  *      so campaign creation can never break.
  */
-import type { CampaignPlan } from "./types";
+import { buildPmaxFromBasics, ensurePaidForBy, sanitizePmax } from "./google-ads";
+import type { CampaignGoal, CampaignPlan } from "./types";
+
+/** Extra context the wizard can hand the planner (all optional). */
+export interface PlanOptions {
+  /** Real business name — anchors headlines + the 25-char short name. */
+  businessName?: string;
+  /** Google wizard page-3 goal — steers copy and the call to action. */
+  goal?: CampaignGoal;
+  /** Political Campaign category: the legally required disclaimer line. */
+  paidForBy?: string;
+}
+
+const GOAL_DESCRIPTIONS: Record<CampaignGoal, string> = {
+  purchases: "drive purchases (in store or online)",
+  leads_form: "get people to send their contact info through a form",
+  leads_calls: "get people to call the business",
+  page_views: "get more people visiting the website",
+  brand_awareness: "make locals recognize and remember the business",
+};
+
+const GOAL_MOCK_CTA: Record<CampaignGoal, string> = {
+  purchases: "Order Online",
+  leads_form: "Get Offer",
+  leads_calls: "Call Now",
+  page_views: "Learn More",
+  brand_awareness: "Visit Us",
+};
 
 interface Vertical {
   match: RegExp;
@@ -105,10 +132,11 @@ function pickBusinessName(intent: string): string {
 async function generateMockPlan(
   intentText: string,
   budget: number,
-  radiusMiles: number
+  radiusMiles: number,
+  opts: PlanOptions = {}
 ): Promise<CampaignPlan> {
   const vertical = VERTICALS.find((v) => v.match.test(intentText)) ?? GENERIC;
-  const name = pickBusinessName(intentText);
+  const name = opts.businessName?.trim() || pickBusinessName(intentText);
 
   const metaInterests = [...vertical.metaInterests];
   const redditInterests = [...vertical.redditInterests];
@@ -139,20 +167,44 @@ async function generateMockPlan(
   // Rough, honest range: local CPMs put ~35–60 impressions per dollar.
   const estMonthlyReach: [number, number] = [budget * 35, budget * 60];
 
+  const adCopy = {
+    headlines,
+    descriptions,
+    callToAction: opts.goal ? GOAL_MOCK_CTA[opts.goal] : "Learn More",
+  };
+  const targeting = {
+    radiusMiles,
+    audienceSummary: summary,
+    googleKeywords: vertical.keywords,
+    metaInterests: metaInterests.slice(0, 6),
+    redditInterests: redditInterests.slice(0, 6),
+  };
+
+  let pmax = buildPmaxFromBasics(adCopy, targeting, name);
+  if (opts.paidForBy?.trim()) pmax = ensurePaidForBy(pmax, opts.paidForBy.trim());
+
   return {
-    adCopy: {
-      headlines,
-      descriptions,
-      callToAction: "Learn More",
-    },
-    targeting: {
-      radiusMiles,
-      audienceSummary: summary,
-      googleKeywords: vertical.keywords,
-      metaInterests: metaInterests.slice(0, 6),
-      redditInterests: redditInterests.slice(0, 6),
-    },
+    adCopy: withDisclaimer(adCopy, opts.paidForBy),
+    targeting,
     estMonthlyReach,
+    pmax,
+  };
+}
+
+/** Appends the political "Paid for by" line to the ad copy when it's missing. */
+function withDisclaimer(
+  adCopy: CampaignPlan["adCopy"],
+  paidForBy?: string
+): CampaignPlan["adCopy"] {
+  const line = paidForBy?.trim();
+  if (!line) return adCopy;
+  if (adCopy.descriptions.some((d) => /paid for by/i.test(d))) return adCopy;
+  return {
+    ...adCopy,
+    descriptions: [
+      ...adCopy.descriptions,
+      `Paid for by ${line.replace(/^paid for by\s*/i, "")}`,
+    ],
   };
 }
 
@@ -235,10 +287,21 @@ Respond with ONLY a valid JSON object — no markdown fences, no commentary — 
     "metaInterests": [4-6 real Facebook/Instagram interest categories],
     "redditInterests": [3-5 subreddits formatted like "r/Coffee"; include "Local city subreddit" as one entry]
   },
-  "estMonthlyReach": [low, high] — estimated monthly ad impressions for this budget, assuming roughly 35-60 impressions per dollar in local markets
+  "estMonthlyReach": [low, high] — estimated monthly ad impressions for this budget, assuming roughly 35-60 impressions per dollar in local markets,
+  "pmax": {
+    "searchThemes": [8-12 short search themes locals would use to find this kind of business],
+    "productTerms": [4-8 short terms for exactly what is being sold or offered],
+    "uniqueSellingPoints": [3-5 selling points, each under 60 characters, drawn from what makes THIS business special],
+    "headlines": [12-15 punchy ad headlines, EACH 30 CHARACTERS OR FEWER — count characters carefully, this is a hard platform limit],
+    "longHeadlines": [5 longer headlines, each under 90 characters],
+    "descriptions": [5 ad descriptions, each under 90 characters],
+    "businessNameShort": the business name in 25 characters or fewer
+  }
 }
 
-Ground everything in the actual business described. If a business name appears, weave it into headlines naturally.`;
+The "pmax" block is the Google Performance Max asset group — respect every character limit exactly; assets over the limit get truncated and read badly.
+Ground everything in the actual business described. If a business name appears, weave it into headlines naturally.
+If the request mentions a required "Paid for by ..." political disclaimer, one pmax description and one adCopy description must end with that exact line.`;
 
 /** Validates and tidies whatever the model returned into a strict CampaignPlan. */
 function coercePlan(raw: unknown, budget: number, radiusMiles: number): CampaignPlan {
@@ -251,6 +314,7 @@ function coercePlan(raw: unknown, budget: number, radiusMiles: number): Campaign
       redditInterests?: unknown;
     };
     estMonthlyReach?: unknown;
+    pmax?: unknown;
   };
 
   const headlines = stringList(obj.adCopy?.headlines, 2, 5, "headlines").map((h) => h.slice(0, 90));
@@ -287,6 +351,9 @@ function coercePlan(raw: unknown, budget: number, radiusMiles: number): Campaign
       redditInterests: stringList(obj.targeting?.redditInterests, 2, 8, "redditInterests"),
     },
     estMonthlyReach,
+    // Lenient on purpose: a malformed pmax block never sinks the whole plan —
+    // generateCampaignPlan backfills it from the classic copy below.
+    pmax: sanitizePmax(obj.pmax) ?? undefined,
   };
 }
 
@@ -297,24 +364,46 @@ function coercePlan(raw: unknown, budget: number, radiusMiles: number): Campaign
 export async function generateCampaignPlan(
   intentText: string,
   budget: number,
-  radiusMiles: number
+  radiusMiles: number,
+  opts: PlanOptions = {}
 ): Promise<CampaignPlan> {
   if (!isAiConfigured()) {
-    return generateMockPlan(intentText, budget, radiusMiles);
+    return generateMockPlan(intentText, budget, radiusMiles, opts);
   }
   try {
-    const reply = await askClaude(
-      PLAN_SYSTEM_PROMPT,
-      `Business & customers: ${intentText}\nMonthly budget: $${budget}\nRadius: ${radiusMiles} miles`,
-      1200
+    const contextLines = [
+      `Business & customers: ${intentText}`,
+      `Monthly budget: $${budget}`,
+      `Radius: ${radiusMiles} miles`,
+      ...(opts.businessName ? [`Business name: ${opts.businessName}`] : []),
+      ...(opts.goal ? [`Campaign goal: ${GOAL_DESCRIPTIONS[opts.goal]}`] : []),
+      ...(opts.paidForBy?.trim()
+        ? [
+            `This is a POLITICAL campaign. Required disclaimer that must appear: "Paid for by ${opts.paidForBy.trim()}"`,
+          ]
+        : []),
+    ];
+    const plan = coercePlan(
+      parseJsonBlock(await askClaude(PLAN_SYSTEM_PROMPT, contextLines.join("\n"), 2000)),
+      budget,
+      radiusMiles
     );
-    return coercePlan(parseJsonBlock(reply), budget, radiusMiles);
+    // The pmax asset group must always exist and always carry the disclaimer.
+    let pmax =
+      plan.pmax ??
+      buildPmaxFromBasics(
+        plan.adCopy,
+        plan.targeting,
+        opts.businessName?.trim() || pickBusinessName(intentText)
+      );
+    if (opts.paidForBy?.trim()) pmax = ensurePaidForBy(pmax, opts.paidForBy.trim());
+    return { ...plan, adCopy: withDisclaimer(plan.adCopy, opts.paidForBy), pmax };
   } catch (err) {
     console.warn(
       "[ai] Claude call failed — using built-in planner:",
       err instanceof Error ? err.message : err
     );
-    return generateMockPlan(intentText, budget, radiusMiles);
+    return generateMockPlan(intentText, budget, radiusMiles, opts);
   }
 }
 

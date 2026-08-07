@@ -276,7 +276,62 @@ toward phone chrome; if UI artifacts persist, soften that line next.
   {waitlisted:true}, AuthForm routes to /waitlist page, dashboard bounces
   stale waitlisted sessions. Open the doors later with WAITLIST_MODE=off.
 
-## GOOGLE ADS BUILD — Owen's 9-page blueprint (Jul 10, BUILD NEXT SESSION)
+## Aug 7 — GOOGLE ADS WIZARD BUILT (data + UI + AI; API publish still pending)
+
+The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
+
+- **Types** (types.ts): CampaignGoal + CAMPAIGN_GOAL_KEYS, LinkedAccounts,
+  PmaxAssets (the AI asset group), GoogleAdsCampaignPlan (moved here from
+  google-ads.ts, which re-exports it). Business.linkedAccountsJson;
+  Campaign.googleAdsJson / googleCampaignId / googleStatus (null until the
+  real API publish exists). CampaignPlan.pmax?: PmaxAssets.
+- **google-ads.ts**: clipAsset (word-boundary clip, drops dangling stopwords),
+  sanitizePmax (enforces Google's char limits IN CODE: 30/90/90/25 — never
+  trust prompt-side limits), buildPmaxFromBasics (fallback asset group from
+  classic adCopy/targeting), ensurePaidForBy, buildGoogleAdsPlan (assembles
+  the full PMax plan: goal→CTA map, images by creative format
+  [landscape+banner+custom→landscape, square→square], logo from brandingJson,
+  YouTube from linkedAccountsJson, sitelinks auto-named from enhance-page URL
+  slugs, dailyBudget = monthly/30.4, locations from zip+radius).
+- **ai.ts**: generateCampaignPlan(intent, budget, radius, opts?) — opts =
+  {businessName, goal, paidForBy}. Prompt requests the pmax block; coercePlan
+  parses it LENIENTLY (bad pmax never sinks a plan — backfilled from basics).
+  Goal steers copy + CTA in both engines. paidForBy guaranteed in adCopy AND
+  pmax descriptions code-side (withDisclaimer/ensurePaidForBy).
+- **Wizard** (CampaignModal): goal radio cards (P3, first question, default
+  purchases), "Where clicks should land" card (P5: landing URL prefilled from
+  business website + enhance-pages chips), bid card (P7: two plain-English
+  buttons + optional $ target cost), political compliance card (amber, only
+  for Political Campaign category: required Paid-for-by input — generate
+  button disabled without it — + Google verification lead-time warning).
+  New props businessWebsite/businessCategory passed from DashboardShell.
+- **GoogleAssetEditor.tsx** (new): collapsible "Your Google ad assets" panel
+  under the campaign preview — headlines/long headlines/descriptions/USPs as
+  editable lines with live char counters, themes/product terms as chip
+  editors. Edits flow into plan.pmax; server re-sanitizes at launch.
+- **BusinessModal**: Linked accounts section (P2: GBP, YouTube, ads phone,
+  app URL) → linkedAccountsJson via cleanLinkedAccounts (empty save clears).
+- **Routes**: /api/generate accepts goal+paidForBy, passes businessName.
+  /api/campaigns POST validates wizard fields, 400s political launches
+  missing paidForBy, builds + stores googleAdsJson. /api/campaigns/[id]
+  PATCH: when the planner re-runs, googleAdsJson is REBUILT with fresh
+  assets but the owner's original wizard choices (goal/landing/bid/
+  disclaimer) preserved. Rerun clones googleAdsJson, nulls google ids.
+- **schema.sql**: columns in main tables + Aug 7 ALTER block at the bottom
+  (linked_accounts_json, google_ads_json, google_campaign_id, google_status).
+  Owen must run the ALTERs BEFORE uploading the code (launches 500 otherwise).
+- **Verified**: sandbox had npm access this time — `tsc --noEmit` (strict)
+  clean AND full `next build` compiled + linted (only Google-Fonts fetch is
+  sandbox-blocked; stubbed for the test and reverted, file byte-identical).
+  Smoke-tested: mock+political plans, char limits, disclaimer, CTA map,
+  buildGoogleAdsPlan assembly (sitelinks, logo, youtube, dailyBudget).
+
+**NOT built yet**: the actual Google API publish (createCampaignBudget →
+createPMaxCampaign → createAssetGroup → status sync — numbered plan at the
+bottom of google-ads.ts) and Owen's OAuth credential walkthrough (list below,
+unchanged). No campaign is sent to Google; googleAdsJson is the ready payload.
+
+## GOOGLE ADS BUILD — Owen's 9-page blueprint (Jul 10, reference)
 
 Owen has a TEST-access developer token (in Vercel as
 GOOGLE_ADS_DEVELOPER_TOKEN — never in code). lib/google-ads.ts holds the

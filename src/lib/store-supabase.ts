@@ -62,6 +62,7 @@ interface BusinessRow {
   phone: string | null;
   website: string | null;
   branding_json: unknown;
+  linked_accounts_json: unknown;
   created_at: string;
 }
 
@@ -88,6 +89,9 @@ interface CampaignRow {
   start_date: string;
   end_date: string | null;
   is_sample: boolean;
+  google_ads_json: unknown;
+  google_campaign_id: string | null;
+  google_status: string | null;
   created_at: string;
 }
 
@@ -117,6 +121,7 @@ const toBusiness = (r: BusinessRow): Business => ({
   phone: r.phone ?? "",
   website: r.website ?? "",
   brandingJson: (r.branding_json as Business["brandingJson"]) ?? [],
+  linkedAccountsJson: (r.linked_accounts_json as Business["linkedAccountsJson"]) ?? {},
   createdAt: r.created_at,
 });
 
@@ -143,6 +148,9 @@ const toCampaign = (r: CampaignRow): Campaign => ({
   startDate: r.start_date,
   endDate: r.end_date,
   isSample: r.is_sample,
+  googleAdsJson: (r.google_ads_json as Campaign["googleAdsJson"]) ?? null,
+  googleCampaignId: r.google_campaign_id ?? null,
+  googleStatus: r.google_status ?? null,
   createdAt: r.created_at,
 });
 
@@ -168,6 +176,9 @@ const campaignToRow = (c: Omit<Campaign, "id" | "createdAt"> & { createdAt?: str
   start_date: c.startDate,
   end_date: c.endDate,
   is_sample: c.isSample,
+  google_ads_json: c.googleAdsJson,
+  google_campaign_id: c.googleCampaignId,
+  google_status: c.googleStatus,
   ...(c.createdAt ? { created_at: c.createdAt } : {}),
 });
 
@@ -289,12 +300,13 @@ export async function createBusiness(
 export async function updateBusiness(
   id: string,
   userId: string,
-  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website" | "brandingJson">>
+  patch: Partial<Pick<Business, "name" | "category" | "description" | "address" | "phone" | "website" | "brandingJson" | "linkedAccountsJson">>
 ): Promise<Business | null> {
-  // Columns are snake_case; map the one camelCase field explicitly.
-  const { brandingJson, ...rest } = patch;
+  // Columns are snake_case; map the camelCase fields explicitly.
+  const { brandingJson, linkedAccountsJson, ...rest } = patch;
   const rowPatch: Record<string, unknown> = { ...rest };
   if (brandingJson !== undefined) rowPatch.branding_json = brandingJson;
+  if (linkedAccountsJson !== undefined) rowPatch.linked_accounts_json = linkedAccountsJson;
   const { data: row, error } = await db()
     .from("businesses")
     .update(rowPatch)
@@ -377,10 +389,16 @@ export async function updateCampaign(
       | "adCopyJson"
       | "creativeUrl"
       | "creativesJson"
+      | "googleAdsJson"
+      | "googleCampaignId"
+      | "googleStatus"
     >
   >
 ): Promise<Campaign | null> {
   const rowPatch: Record<string, unknown> = {};
+  if (patch.googleAdsJson !== undefined) rowPatch.google_ads_json = patch.googleAdsJson;
+  if (patch.googleCampaignId !== undefined) rowPatch.google_campaign_id = patch.googleCampaignId;
+  if (patch.googleStatus !== undefined) rowPatch.google_status = patch.googleStatus;
   if (patch.creativeUrl !== undefined) rowPatch.creative_url = patch.creativeUrl;
   if (patch.creativesJson !== undefined) rowPatch.creatives_json = patch.creativesJson;
   if (patch.name !== undefined) rowPatch.name = patch.name;

@@ -17,6 +17,20 @@
  * 9-page wizard (see HANDOFF blueprint) collects.
  */
 
+import type {
+  AdCopy,
+  Business,
+  CampaignCreative,
+  CampaignGoal,
+  GoogleAdsCampaignPlan,
+  PmaxAssets,
+  Targeting,
+} from "./types";
+
+// The plan shape now lives in types.ts (it's stored on Campaign.googleAdsJson);
+// re-exported here so google-ads-centric code can keep importing it from this file.
+export type { GoogleAdsCampaignPlan } from "./types";
+
 const API_VERSION = process.env.GOOGLE_ADS_API_VERSION ?? "v20";
 const BASE = `https://googleads.googleapis.com/${API_VERSION}`;
 
@@ -29,36 +43,221 @@ export function isGoogleAdsConfigured(): boolean {
   );
 }
 
-/** Everything the wizard collects that Google's Performance Max needs. */
-export interface GoogleAdsCampaignPlan {
-  /** Page 3 — campaign goal. */
-  goal: "purchases" | "leads_form" | "leads_calls" | "page_views" | "brand_awareness";
-  /** Page 4 — search themes + geo/language. */
-  searchThemes: string[]; // words/phrases people search
-  locations: string[]; // geo target names or radius spec
-  languageCode: string; // e.g. "en"
-  /** Page 5 — landing + positioning. */
+// ---------------------------------------------------------------------------
+// Asset hygiene — Google's char limits are hard rules, so they're enforced in
+// code here (shared by the AI planner, the API routes, and the preview editor).
+// ---------------------------------------------------------------------------
+
+/** Clip to a char budget at a word boundary, dropping trailing punctuation. */
+export function clipAsset(value: string, max: number): string {
+  const s = value.trim().replace(/\s+/g, " ");
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  let clipped = (lastSpace > max * 0.5 ? cut.slice(0, lastSpace) : s.slice(0, max)).trim();
+  clipped = clipped.replace(/[,;:\-–—&/]+$/, "").trim();
+  // Don't end on a dangling word ("Your new favorite The") — trim it off.
+  clipped = clipped.replace(
+    /\s+(the|a|an|of|for|to|and|or|with|your|our|is|in|on|at|by)[.!?]*$/i,
+    ""
+  );
+  return clipped.replace(/[,;:\-–—&/]+$/, "").trim();
+}
+
+function cleanList(value: unknown, maxChars: number, maxItems: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const s = clipAsset(item, maxChars);
+    const key = s.toLowerCase();
+    if (!s || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+    if (out.length >= maxItems) break;
+  }
+  return out;
+}
+
+/** Validates an untyped pmax blob (from the AI or the preview editor) into safe assets. */
+export function sanitizePmax(raw: unknown): PmaxAssets | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const assets: PmaxAssets = {
+    searchThemes: cleanList(o.searchThemes, 80, 12),
+    productTerms: cleanList(o.productTerms, 60, 8),
+    uniqueSellingPoints: cleanList(o.uniqueSellingPoints, 90, 6),
+    headlines: cleanList(o.headlines, 30, 15),
+    longHeadlines: cleanList(o.longHeadlines, 90, 5),
+    descriptions: cleanList(o.descriptions, 90, 5),
+    businessNameShort:
+      typeof o.businessNameShort === "string" ? clipAsset(o.businessNameShort, 25) : "",
+  };
+  // Not usable as an asset group without the core text assets.
+  if (assets.headlines.length < 3 || assets.descriptions.length < 2) return null;
+  return assets;
+}
+
+/**
+ * Derives a complete PMax asset group from the classic ad copy + targeting —
+ * the safety net when the AI reply skips or flubs the pmax block, and the
+ * generator for the built-in (no-API-key) planner.
+ */
+export function buildPmaxFromBasics(
+  adCopy: AdCopy,
+  targeting: Targeting,
+  businessName: string
+): PmaxAssets {
+  const headlines = cleanList(
+    [
+      businessName,
+      ...adCopy.headlines,
+      ...targeting.googleKeywords.map((k) =>
+        k.replace(/\s*near me\s*/gi, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase())
+      ),
+      "Locally Owned & Trusted",
+      "Right Around The Corner",
+    ],
+    30,
+    15
+  );
+  const longHeadlines = cleanList(
+    [...adCopy.headlines, targeting.audienceSummary],
+    90,
+    5
+  );
+  const descriptions = cleanList(
+    [...adCopy.descriptions, targeting.audienceSummary],
+    90,
+    5
+  );
+  const productTerms = cleanList(
+    targeting.googleKeywords.map((k) =>
+      k.replace(/\s*(near me|open now|nearby)\s*/gi, " ").trim()
+    ),
+    60,
+    8
+  );
+  return {
+    searchThemes: cleanList(targeting.googleKeywords, 80, 12),
+    productTerms,
+    uniqueSellingPoints: cleanList(
+      adCopy.descriptions.flatMap((d) => d.split(/(?<=[.!])\s+/)),
+      90,
+      5
+    ),
+    headlines,
+    longHeadlines,
+    descriptions,
+    businessNameShort: clipAsset(businessName, 25),
+  };
+}
+
+/** Guarantees the legally required political disclaimer survives into the copy. */
+export function ensurePaidForBy(assets: PmaxAssets, paidForBy: string): PmaxAssets {
+  const line = clipAsset(`Paid for by ${paidForBy.replace(/^paid for by\s*/i, "")}`, 90);
+  const has = assets.descriptions.some((d) => /paid for by/i.test(d));
+  if (has) return assets;
+  const descriptions =
+    assets.descriptions.length >= 5
+      ? [...assets.descriptions.slice(0, 4), line]
+      : [...assets.descriptions, line];
+  return { ...assets, descriptions };
+}
+
+const GOAL_CTA: Record<CampaignGoal, GoogleAdsCampaignPlan["callToAction"]> = {
+  purchases: "SHOP_NOW",
+  leads_form: "SIGN_UP",
+  leads_calls: "CONTACT_US",
+  page_views: "LEARN_MORE",
+  brand_awareness: "LEARN_MORE",
+};
+
+/** "/about-us" → "About Us" — friendly sitelink text from a URL (≤25 chars). */
+function sitelinkTextFrom(url: string): string {
+  try {
+    const path = new URL(url.startsWith("http") ? url : `https://${url}`).pathname;
+    const segment = path.split("/").filter(Boolean).pop() ?? "";
+    const words = segment.replace(/[-_]+/g, " ").replace(/\.\w+$/, "").trim();
+    if (!words) return "Learn More";
+    return clipAsset(words.replace(/\b\w/g, (c) => c.toUpperCase()), 25) || "Learn More";
+  } catch {
+    return "Learn More";
+  }
+}
+
+function normalizeUrl(url: string): string {
+  const s = url.trim();
+  if (!s) return "";
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+}
+
+/** What the wizard hands over at launch — everything else is derived. */
+export interface BuildGoogleAdsPlanInput {
+  goal: CampaignGoal;
   landingPageUrl: string;
-  productTerms: string[]; // what's being advertised, short terms
-  uniqueSellingPoints: string[];
-  enhancePageUrls: string[]; // pages to pull/enhance assets from
-  /** Page 6 — the asset group (AI pre-fills all of it). */
-  headlines: string[]; // up to 15 × 30 chars
-  longHeadlines: string[]; // up to 5 × 90 chars
-  descriptions: string[]; // up to 5 × 90 chars
-  imageUrls: { landscape: string[]; square: string[] };
-  squareLogoUrl: string | null;
-  businessNameShort: string; // 25 chars
-  videoUrls: string[];
-  sitelinks: Array<{ text: string; url: string }>;
-  callToAction:
-    | "LEARN_MORE" | "GET_QUOTE" | "APPLY_NOW" | "SIGN_UP" | "CONTACT_US"
-    | "SUBSCRIBE" | "DOWNLOAD" | "BOOK_NOW" | "SHOP_NOW";
-  /** Page 7 — bidding. */
-  bidStrategy: "maximize_conversions" | "maximize_conversion_value";
-  targetCpa?: number; // dollars, optional
-  /** Page 8 — budget. */
-  dailyBudget: number; // dollars (monthly budget / 30.4)
+  enhancePageUrls: string[];
+  bidStrategy: GoogleAdsCampaignPlan["bidStrategy"];
+  targetCpa?: number;
+  monthlyBudget: number;
+  zip: string;
+  radiusMiles: number;
+  pmax: PmaxAssets;
+  business: Pick<Business, "name" | "website" | "brandingJson" | "linkedAccountsJson">;
+  creatives: CampaignCreative[];
+  paidForBy?: string | null;
+}
+
+/**
+ * Assembles the complete Performance Max plan from the wizard's answers, the
+ * AI asset group, and the business profile. Stored on Campaign.googleAdsJson
+ * at launch — the exact payload the API adapter below will publish.
+ */
+export function buildGoogleAdsPlan(input: BuildGoogleAdsPlanInput): GoogleAdsCampaignPlan {
+  const paidForBy = input.paidForBy?.trim() || null;
+  const pmax = paidForBy ? ensurePaidForBy(input.pmax, paidForBy) : input.pmax;
+
+  const landscape = input.creatives
+    .filter((c) => c.format === "landscape" || c.format === "banner" || c.format === "custom")
+    .map((c) => c.url);
+  const square = input.creatives.filter((c) => c.format === "square").map((c) => c.url);
+  const logo = input.business.brandingJson.find((b) => b.label === "Logo")?.url ?? null;
+  const youtube = input.business.linkedAccountsJson?.youtube?.trim();
+
+  const enhancePageUrls = input.enhancePageUrls
+    .map(normalizeUrl)
+    .filter(Boolean)
+    .slice(0, 10);
+
+  return {
+    goal: input.goal,
+    searchThemes: pmax.searchThemes,
+    locations: [
+      `${input.radiusMiles} miles around ${input.zip.trim() || "the business address"}`,
+    ],
+    languageCode: "en",
+    landingPageUrl:
+      normalizeUrl(input.landingPageUrl) || normalizeUrl(input.business.website) || "",
+    productTerms: pmax.productTerms,
+    uniqueSellingPoints: pmax.uniqueSellingPoints,
+    enhancePageUrls,
+    headlines: pmax.headlines,
+    longHeadlines: pmax.longHeadlines,
+    descriptions: pmax.descriptions,
+    imageUrls: { landscape, square },
+    squareLogoUrl: logo,
+    businessNameShort: pmax.businessNameShort || clipAsset(input.business.name, 25),
+    videoUrls: youtube ? [youtube] : [],
+    sitelinks: enhancePageUrls.map((url) => ({ text: sitelinkTextFrom(url), url })),
+    callToAction: GOAL_CTA[input.goal],
+    bidStrategy: input.bidStrategy,
+    ...(input.targetCpa && input.targetCpa > 0
+      ? { targetCpa: Math.round(input.targetCpa * 100) / 100 }
+      : {}),
+    dailyBudget: Math.round((input.monthlyBudget / 30.4) * 100) / 100,
+    paidForBy,
+  };
 }
 
 /** Fetches a fresh OAuth access token from the stored refresh token. */

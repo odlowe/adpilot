@@ -1,9 +1,9 @@
 "use client";
 
-import { AlertTriangle, ImagePlus, Loader2, X } from "lucide-react";
+import { AlertTriangle, ImagePlus, Link2, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { readError } from "@/lib/client";
-import type { Business, BrandingImage } from "@/lib/types";
+import type { Business, BrandingImage, LinkedAccounts } from "@/lib/types";
 
 const CATEGORIES = [
   "Home Services",
@@ -33,6 +33,7 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
   const [phone, setPhone] = useState(business?.phone ?? "");
   const [website, setWebsite] = useState(business?.website ?? "");
   const [branding, setBranding] = useState<BrandingImage[]>(business?.brandingJson ?? []);
+  const [linked, setLinked] = useState<LinkedAccounts>(business?.linkedAccountsJson ?? {});
   const [uploadingBrand, setUploadingBrand] = useState(false);
   const brandInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -47,7 +48,7 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
       const res = await fetch(editing ? `/api/businesses/${business!.id}` : "/api/businesses", {
         method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, category, description, address, phone, website, brandingImages: branding }),
+        body: JSON.stringify({ name, category, description, address, phone, website, brandingImages: branding, linkedAccounts: linked }),
       });
       if (!res.ok) {
         setError(await readError(res));
@@ -275,6 +276,53 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
               <span className="text-[10px] font-semibold">Add</span>
             </button>
           )}
+        </div>
+
+        {/* ---- linked accounts (Google Ads wizard, page 2) ---- */}
+        <label className={labelClass}>
+          <span className="flex items-center gap-1.5">
+            <Link2 size={14} className="text-emerald-600" /> Linked accounts{" "}
+            <span className="font-normal text-slate-400">(optional — helps your Google ads)</span>
+          </span>
+        </label>
+        <p className="mt-1 text-xs text-slate-400">
+          Google shows richer ads when these are connected. Skip anything you don&apos;t have.
+        </p>
+        <div className="mt-2 space-y-2.5">
+          <input
+            type="text"
+            value={linked.gbp ?? ""}
+            onChange={(e) => setLinked((prev) => ({ ...prev, gbp: e.target.value }))}
+            placeholder="Google Business Profile link (your listing on Google Maps)"
+            aria-label="Google Business Profile link"
+            className={inputClass}
+          />
+          <input
+            type="text"
+            value={linked.youtube ?? ""}
+            onChange={(e) => setLinked((prev) => ({ ...prev, youtube: e.target.value }))}
+            placeholder="YouTube channel or video link"
+            aria-label="YouTube channel or video link"
+            className={inputClass}
+          />
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <input
+              type="tel"
+              value={linked.phone ?? ""}
+              onChange={(e) => setLinked((prev) => ({ ...prev, phone: e.target.value }))}
+              placeholder="Phone for ads (if different)"
+              aria-label="Phone number for ads"
+              className={inputClass}
+            />
+            <input
+              type="text"
+              value={linked.appUrl ?? ""}
+              onChange={(e) => setLinked((prev) => ({ ...prev, appUrl: e.target.value }))}
+              placeholder="Mobile app link (if you have one)"
+              aria-label="Mobile app link"
+              className={inputClass}
+            />
+          </div>
         </div>
 
         {error && (

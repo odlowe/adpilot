@@ -50,6 +50,7 @@ create table if not exists public.businesses (
   phone       text not null default '',
   website     text not null default '',
   branding_json jsonb not null default '[]'::jsonb,
+  linked_accounts_json jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now()
 );
 
@@ -77,6 +78,9 @@ create table if not exists public.campaigns (
   start_date        timestamptz not null default now(),
   end_date          timestamptz,
   is_sample         boolean not null default false,
+  google_ads_json   jsonb,
+  google_campaign_id text,
+  google_status     text,
   created_at        timestamptz not null default now()
 );
 
@@ -117,3 +121,9 @@ alter table public.email_verifications enable row level security;
 -- Existing accounts are grandfathered in as verified; new signups start false:
 alter table public.users add column if not exists email_verified boolean not null default true;
 alter table public.users alter column email_verified set default false;
+
+-- Aug 7 additions — Google Ads wizard (linked accounts + stored PMax plan):
+alter table public.businesses add column if not exists linked_accounts_json jsonb not null default '{}'::jsonb;
+alter table public.campaigns add column if not exists google_ads_json jsonb;
+alter table public.campaigns add column if not exists google_campaign_id text;
+alter table public.campaigns add column if not exists google_status text;
