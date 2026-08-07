@@ -127,7 +127,7 @@ export default function CampaignModal({
   const [budget, setBudget] = useState(initialDraft?.budget ?? 1000);
   const [radius, setRadius] = useState(initialDraft?.radiusMiles ?? 15);
   const [zip, setZip] = useState(initialDraft?.zip ?? "");
-  const [duration, setDuration] = useState(initialDraft?.durationMonths ?? 1);
+  const [duration, setDuration] = useState(initialDraft?.durationWeeks ?? 4);
   const [continuous, setContinuous] = useState(initialDraft?.continuous ?? false);
   const [phase, setPhase] = useState<Phase>("editing");
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
@@ -345,7 +345,7 @@ export default function CampaignModal({
           businessId,
           budget,
           zip,
-          durationMonths: duration,
+          durationWeeks: duration,
           continuous,
           manualMode,
           platformSplit: split,
@@ -380,7 +380,10 @@ export default function CampaignModal({
       // The campaign is already created either way — a cancelled checkout
       // just leaves it in preview mode.
       try {
-        const payUrl = await startCheckout(`${businessName} — ${intentText.slice(0, 40)}`, budget);
+        const payUrl = await startCheckout(
+          `${businessName} — ${plan.targeting.audienceLabel?.trim() || intentText.slice(0, 40)}`,
+          budget
+        );
         if (payUrl) {
           window.location.href = payUrl;
           return;
@@ -480,8 +483,16 @@ export default function CampaignModal({
                   <p className="mt-1.5 text-xs leading-relaxed text-amber-800">
                     U.S. law requires a &ldquo;Paid for by&rdquo; disclaimer on every political ad,
                     and Google must verify you as an election advertiser before your ads can run —
-                    that verification usually takes several days, so start it early at{" "}
-                    <span className="font-semibold">google.com/adspolicy</span>.
+                    that verification usually takes several days, so{" "}
+                    <a
+                      href="https://support.google.com/adspolicy/answer/9002729"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline underline-offset-2 transition hover:text-amber-700"
+                    >
+                      start it early on Google&apos;s election ads page
+                    </a>
+                    .
                   </p>
                   <label className="mt-3 block text-xs font-bold text-amber-900" htmlFor="paid-for-by">
                     Paid for by <span className="font-normal">(exactly as it should appear)</span>
@@ -544,7 +555,7 @@ export default function CampaignModal({
                     <Timer size={15} className="text-emerald-600" /> The Speed Dial — duration
                   </p>
                   <div className={`mt-3 transition ${continuous ? "pointer-events-none opacity-40" : ""}`}>
-                    <Slider label="" min={1} max={6} value={duration} onChange={setDuration} format={(v) => `${v} month${v === 1 ? "" : "s"}`} leftHint="1 month" rightHint="6 months" />
+                    <Slider label="" min={1} max={26} value={duration} onChange={setDuration} format={(v) => `${v} week${v === 1 ? "" : "s"}`} leftHint="1 week" rightHint="26 weeks" />
                   </div>
                   <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-600">
                     <input
@@ -553,7 +564,7 @@ export default function CampaignModal({
                       onChange={(e) => setContinuous(e.target.checked)}
                       className="h-4 w-4 accent-emerald-600"
                     />
-                    Continuous / Ongoing — run month to month, pause anytime
+                    Continuous / Ongoing — run week to week, pause anytime
                   </label>
                 </div>
 
@@ -690,6 +701,13 @@ export default function CampaignModal({
                 <div>
                   <p className="text-sm font-semibold text-navy-900">
                     Ad photo or video <span className="font-normal text-slate-400">(optional)</span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Best sizes: <span className="font-semibold text-slate-500">1200×628</span> feed
+                    &middot; <span className="font-semibold text-slate-500">1200×1200</span> square
+                    &middot; <span className="font-semibold text-slate-500">1080×1920</span> story
+                    &middot; <span className="font-semibold text-slate-500">1200×514</span> banner
+                    &mdash; JPG or PNG
                   </p>
                   <div className="mt-2">
                     <CreativeUploader onUploaded={setCreativeUrl} />

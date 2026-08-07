@@ -35,6 +35,8 @@ export interface AdCopy {
 export interface Targeting {
   radiusMiles: number;
   audienceSummary: string;
+  /** 3-5 word demographic label ("eco-minded local moms") — names the campaign. */
+  audienceLabel?: string;
   googleKeywords: string[];
   metaInterests: string[];
   redditInterests: string[];
@@ -201,7 +203,8 @@ export interface Campaign {
   name: string;
   budget: number;
   zip: string;
-  durationMonths: number;
+  /** Run length in weeks (1–26), matching how Google Ads frames duration. */
+  durationWeeks: number;
   continuous: boolean;
   /** true when the owner used Manual Mode instead of letting the agent decide */
   manualMode: boolean;
@@ -235,6 +238,6 @@ export interface CampaignDraft {
   budget: number;
   radiusMiles: number;
   zip: string;
-  durationMonths: number;
+  durationWeeks: number;
   continuous: boolean;
 }

@@ -268,7 +268,7 @@ export default function ActiveCampaigns({
                       </span>
                       <span className="flex items-center gap-1">
                         <Radio size={13} />
-                        {campaign.continuous ? "Continuous" : `${campaign.durationMonths} month run`}
+                        {campaign.continuous ? "Continuous" : `${campaign.durationWeeks} week run`}
                       </span>
                       {campaign.manualMode && (
                         <span className="flex items-center gap-1 font-semibold text-navy-700">

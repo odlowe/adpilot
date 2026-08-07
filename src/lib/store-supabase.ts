@@ -73,7 +73,7 @@ interface CampaignRow {
   name: string;
   budget: number;
   zip: string;
-  duration_months: number;
+  duration_weeks: number;
   continuous: boolean;
   manual_mode: boolean;
   platform_split: PlatformSplit;
@@ -132,7 +132,7 @@ const toCampaign = (r: CampaignRow): Campaign => ({
   name: r.name,
   budget: r.budget,
   zip: r.zip,
-  durationMonths: r.duration_months,
+  durationWeeks: r.duration_weeks,
   continuous: r.continuous,
   manualMode: r.manual_mode,
   platformSplit: r.platform_split,
@@ -160,7 +160,7 @@ const campaignToRow = (c: Omit<Campaign, "id" | "createdAt"> & { createdAt?: str
   name: c.name,
   budget: c.budget,
   zip: c.zip,
-  duration_months: c.durationMonths,
+  duration_weeks: c.durationWeeks,
   continuous: c.continuous,
   manual_mode: c.manualMode,
   platform_split: c.platformSplit,
@@ -378,7 +378,7 @@ export async function updateCampaign(
       | "name"
       | "budget"
       | "zip"
-      | "durationMonths"
+      | "durationWeeks"
       | "continuous"
       | "manualMode"
       | "platformSplit"
@@ -404,7 +404,7 @@ export async function updateCampaign(
   if (patch.name !== undefined) rowPatch.name = patch.name;
   if (patch.budget !== undefined) rowPatch.budget = patch.budget;
   if (patch.zip !== undefined) rowPatch.zip = patch.zip;
-  if (patch.durationMonths !== undefined) rowPatch.duration_months = patch.durationMonths;
+  if (patch.durationWeeks !== undefined) rowPatch.duration_weeks = patch.durationWeeks;
   if (patch.continuous !== undefined) rowPatch.continuous = patch.continuous;
   if (patch.manualMode !== undefined) rowPatch.manual_mode = patch.manualMode;
   if (patch.platformSplit !== undefined) rowPatch.platform_split = patch.platformSplit;

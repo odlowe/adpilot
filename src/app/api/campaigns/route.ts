@@ -50,7 +50,7 @@ export async function POST(request: Request) {
         businessId?: string;
         budget?: number;
         zip?: string;
-        durationMonths?: number;
+        durationWeeks?: number;
         continuous?: boolean;
         manualMode?: boolean;
         platformSplit?: Partial<PlatformSplit>;
@@ -143,10 +143,15 @@ export async function POST(request: Request) {
   const campaign = await createCampaign({
     userId: user.id,
     businessId: business.id,
-    name: `${business.name} — ${summary.slice(0, 44)}${summary.length > 44 ? "…" : ""}`,
+    // Short demographic label, not the whole customer description —
+    // "Main St. Bakery — eco-minded local moms", with a clipped fallback.
+    name: `${business.name} — ${
+      body.plan.targeting.audienceLabel?.trim().slice(0, 48) ||
+      `${summary.slice(0, 44)}${summary.length > 44 ? "…" : ""}`
+    }`,
     budget,
     zip,
-    durationMonths: Math.min(6, Math.max(1, Math.round(body.durationMonths ?? 1))),
+    durationWeeks: Math.min(26, Math.max(1, Math.round(body.durationWeeks ?? 4))),
     continuous: Boolean(body.continuous),
     manualMode: Boolean(body.manualMode),
     platformSplit: body.manualMode
@@ -179,7 +184,7 @@ export async function POST(request: Request) {
       businessName: business.name,
       campaignName: campaign.name,
       budget: campaign.budget,
-      durationMonths: campaign.durationMonths,
+      durationWeeks: campaign.durationWeeks,
       continuous: campaign.continuous,
       radiusMiles: campaign.targetingJson.radiusMiles,
       zip: campaign.zip,

@@ -242,7 +242,7 @@ export async function updateCampaign(
       | "name"
       | "budget"
       | "zip"
-      | "durationMonths"
+      | "durationWeeks"
       | "continuous"
       | "manualMode"
       | "platformSplit"

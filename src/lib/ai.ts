@@ -140,8 +140,10 @@ async function generateMockPlan(
 
   const metaInterests = [...vertical.metaInterests];
   const redditInterests = [...vertical.redditInterests];
+  let matchedHint: (typeof AUDIENCE_HINTS)[number] | null = null;
   for (const hint of AUDIENCE_HINTS) {
     if (hint.match.test(intentText)) {
+      matchedHint = matchedHint ?? hint;
       metaInterests.unshift(hint.meta);
       redditInterests.unshift(hint.reddit);
     }
@@ -175,6 +177,10 @@ async function generateMockPlan(
   const targeting = {
     radiusMiles,
     audienceSummary: summary,
+    // e.g. "Parents with young children nearby" / "Nearby bakery & café customers"
+    audienceLabel: matchedHint
+      ? `${matchedHint.meta} nearby`.slice(0, 48)
+      : `Nearby ${vertical.noun} customers`.slice(0, 48),
     googleKeywords: vertical.keywords,
     metaInterests: metaInterests.slice(0, 6),
     redditInterests: redditInterests.slice(0, 6),
@@ -283,6 +289,7 @@ Respond with ONLY a valid JSON object — no markdown fences, no commentary — 
   "targeting": {
     "radiusMiles": the radius you were given (number),
     "audienceSummary": one sentence describing exactly who the ads will reach and why,
+    "audienceLabel": 3-5 plain words naming the target demographic (e.g. "eco-minded local moms") — becomes the campaign's short name,
     "googleKeywords": [4-6 search phrases real locals would type, mostly "... near me" style],
     "metaInterests": [4-6 real Facebook/Instagram interest categories],
     "redditInterests": [3-5 subreddits formatted like "r/Coffee"; include "Local city subreddit" as one entry]
@@ -309,6 +316,7 @@ function coercePlan(raw: unknown, budget: number, radiusMiles: number): Campaign
     adCopy?: { headlines?: unknown; descriptions?: unknown; callToAction?: unknown };
     targeting?: {
       audienceSummary?: unknown;
+      audienceLabel?: unknown;
       googleKeywords?: unknown;
       metaInterests?: unknown;
       redditInterests?: unknown;
@@ -346,6 +354,9 @@ function coercePlan(raw: unknown, budget: number, radiusMiles: number): Campaign
     targeting: {
       radiusMiles,
       audienceSummary,
+      ...(typeof obj.targeting?.audienceLabel === "string" && obj.targeting.audienceLabel.trim()
+        ? { audienceLabel: obj.targeting.audienceLabel.trim().slice(0, 48) }
+        : {}),
       googleKeywords: stringList(obj.targeting?.googleKeywords, 3, 8, "googleKeywords"),
       metaInterests: stringList(obj.targeting?.metaInterests, 3, 8, "metaInterests"),
       redditInterests: stringList(obj.targeting?.redditInterests, 2, 8, "redditInterests"),

@@ -217,7 +217,7 @@ export default function HistoryTable({
                     {fmtDate(campaign.startDate)} — {campaign.endDate ? fmtDate(campaign.endDate) : "ongoing"}
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 font-bold tabular-nums text-navy-900">
-                    {money(campaign.budget * campaign.durationMonths)}
+                    {money(Math.round((campaign.budget * campaign.durationWeeks) / 4.345))}
                   </td>
                   <td className="px-5 py-4 font-medium text-emerald-700">{outcomeSummary(metrics)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-right">

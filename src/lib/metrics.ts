@@ -95,7 +95,7 @@ export function windowDaysFor(campaigns: Campaign[], timeframe: Timeframe): numb
 export function budgetProgress(campaign: Campaign): number {
   if (campaign.status === "completed") return 1;
   const elapsedDays = (Date.now() - new Date(campaign.startDate).getTime()) / MS_PER_DAY;
-  const cycleDays = campaign.continuous ? 30 : campaign.durationMonths * 30;
+  const cycleDays = campaign.continuous ? 30 : campaign.durationWeeks * 7;
   return Math.max(0.04, Math.min(1, elapsedDays / cycleDays));
 }
 
@@ -122,7 +122,7 @@ export function metricsForCampaign(campaign: Campaign, windowDays: number = DAYS
   const activeEnd = Math.min(
     today,
     campaign.endDate ? startOfDay(new Date(campaign.endDate)).getTime() : Infinity,
-    campaign.continuous ? Infinity : activeStart + (campaign.durationMonths * 30 - 1) * MS_PER_DAY
+    campaign.continuous ? Infinity : activeStart + (campaign.durationWeeks * 7 - 1) * MS_PER_DAY
   );
 
   const series: DayPoint[] = [];

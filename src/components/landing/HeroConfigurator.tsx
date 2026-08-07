@@ -23,7 +23,7 @@ export default function HeroConfigurator() {
   const [budget, setBudget] = useState(1000);
   const [radius, setRadius] = useState(15);
   const [zip, setZip] = useState("");
-  const [duration, setDuration] = useState(1);
+  const [duration, setDuration] = useState(4);
   const [continuous, setContinuous] = useState(false);
 
   const fee = Math.round(budget * 0.15);
@@ -34,7 +34,7 @@ export default function HeroConfigurator() {
       budget,
       radiusMiles: radius,
       zip,
-      durationMonths: duration,
+      durationWeeks: duration,
       continuous,
     };
     try {
@@ -122,12 +122,12 @@ export default function HeroConfigurator() {
             <Slider
               label=""
               min={1}
-              max={6}
+              max={26}
               value={duration}
               onChange={setDuration}
-              format={(v) => `${v} month${v === 1 ? "" : "s"}`}
-              leftHint="1 month"
-              rightHint="6 months"
+              format={(v) => `${v} week${v === 1 ? "" : "s"}`}
+              leftHint="1 week"
+              rightHint="26 weeks"
             />
           </div>
           <button

@@ -45,7 +45,7 @@ export async function POST(
     name: `${baseName.slice(0, 110)} (rerun)`,
     budget: source.budget,
     zip: source.zip,
-    durationMonths: source.durationMonths,
+    durationWeeks: source.durationWeeks,
     continuous: source.continuous,
     manualMode: source.manualMode,
     platformSplit: { ...source.platformSplit },

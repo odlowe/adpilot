@@ -42,7 +42,7 @@ function cleanSplit(split: unknown): PlatformSplit | undefined {
 /**
  * Campaign controls and edits:
  *  - { action: "pause" | "resume" | "end" } changes status
- *  - { updates: { name, budget, zip, durationMonths, continuous, radiusMiles,
+ *  - { updates: { name, budget, zip, durationWeeks, continuous, radiusMiles,
  *      googleKeywords, platformSplit, siteCategories, customSites } } edits fields
  */
 export async function PATCH(
@@ -62,7 +62,7 @@ export async function PATCH(
           industryText?: string;
           budget?: number;
           zip?: string;
-          durationMonths?: number;
+          durationWeeks?: number;
           continuous?: boolean;
           radiusMiles?: number;
           googleKeywords?: string[];
@@ -86,8 +86,8 @@ export async function PATCH(
     if (typeof body.updates.industryText === "string" && body.updates.industryText.trim().length >= 12) {
       patch.industryText = body.updates.industryText.trim().slice(0, 2000);
     }
-    if (body.updates.durationMonths !== undefined) {
-      patch.durationMonths = Math.min(6, Math.max(1, Math.round(Number(body.updates.durationMonths) || 1)));
+    if (body.updates.durationWeeks !== undefined) {
+      patch.durationWeeks = Math.min(26, Math.max(1, Math.round(Number(body.updates.durationWeeks) || 4)));
     }
     if (body.updates.continuous !== undefined) patch.continuous = Boolean(body.updates.continuous);
 

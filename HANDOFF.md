@@ -326,6 +326,26 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
   Smoke-tested: mock+political plans, char limits, disclaimer, CTA map,
   buildGoogleAdsPlan assembly (sitelinks, logo, youtube, dailyBudget).
 
+### Aug 7 (round 2) — Owen's polish batch
+- Political card: "start it early" now LINKS to Google's election-ads
+  verification page (support.google.com/adspolicy/answer/9002729, new tab).
+- Upload section shows recommended sizes line (1200×628 / 1200×1200 /
+  1080×1920 / 1200×514, JPG/PNG).
+- **Campaign names**: Targeting gained optional audienceLabel (3-5 word
+  demographic, AI-written; mock derives from AUDIENCE_HINTS/vertical).
+  campaigns POST names campaigns `Business — <label>` (falls back to the old
+  clipped-summary), and Stripe checkout line items use it too.
+- **DURATION IS NOW WEEKS (1–26, default 4)** — durationMonths is GONE from
+  the codebase: Campaign.durationWeeks + CampaignDraft.durationWeeks; all
+  three dials (wizard, edit modal, landing configurator) say weeks like
+  Google does; metrics cycleDays = weeks*7; receipt email says weeks;
+  HistoryTable total = budget × weeks/4.345; ActiveCampaigns "N week run";
+  samples 8/4/4 weeks. DB: campaigns.duration_weeks column with a
+  months×4 backfill migration at the bottom of schema.sql — old
+  duration_months column stays behind ignored (it has a NOT NULL default,
+  so inserts without it are fine). Old landing-page localStorage drafts
+  (durationMonths shape) just fall back to the 4-week default.
+
 **NOT built yet**: the actual Google API publish (createCampaignBudget →
 createPMaxCampaign → createAssetGroup → status sync — numbered plan at the
 bottom of google-ads.ts) and Owen's OAuth credential walkthrough (list below,

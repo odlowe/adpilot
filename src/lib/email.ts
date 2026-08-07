@@ -230,21 +230,21 @@ export async function sendCampaignReceiptEmail(options: {
   businessName: string;
   campaignName: string;
   budget: number;
-  durationMonths: number;
+  durationWeeks: number;
   continuous: boolean;
   radiusMiles: number;
   zip: string;
   startDate: string;
   dashboardUrl?: string;
 }) {
-  const { to, ownerName, businessName, campaignName, budget, durationMonths, continuous, radiusMiles, zip, startDate, dashboardUrl } = options;
+  const { to, ownerName, businessName, campaignName, budget, durationWeeks, continuous, radiusMiles, zip, startDate, dashboardUrl } = options;
   const fee = Math.round(budget * 0.15);
   const total = budget + fee;
   const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
   const firstName = ownerName.split(" ")[0] || ownerName;
   const runLength = continuous
     ? "Continuous — runs until you pause or end it"
-    : `${durationMonths} month${durationMonths === 1 ? "" : "s"}`;
+    : `${durationWeeks} week${durationWeeks === 1 ? "" : "s"}`;
   const reach = `${radiusMiles} mile${radiusMiles === 1 ? "" : "s"}${zip ? ` around ${zip}` : ""}`;
   const launchDate = new Date(startDate).toLocaleDateString("en-US", {
     month: "long",

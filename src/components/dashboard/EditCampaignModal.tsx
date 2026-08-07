@@ -42,7 +42,7 @@ export default function EditCampaignModal({
   const [industryText, setIndustryText] = useState(campaign.industryText);
   const [budget, setBudget] = useState(campaign.budget);
   const [zip, setZip] = useState(campaign.zip);
-  const [duration, setDuration] = useState(campaign.durationMonths);
+  const [duration, setDuration] = useState(campaign.durationWeeks);
   const [continuous, setContinuous] = useState(campaign.continuous);
   const [radius, setRadius] = useState(campaign.targetingJson.radiusMiles);
 
@@ -113,7 +113,7 @@ export default function EditCampaignModal({
             industryText,
             budget,
             zip,
-            durationMonths: duration,
+            durationWeeks: duration,
             continuous,
             radiusMiles: radius,
             googleKeywords: keywords,
@@ -235,12 +235,12 @@ export default function EditCampaignModal({
           <Slider
             label="Duration"
             min={1}
-            max={6}
+            max={26}
             value={duration}
             onChange={setDuration}
-            format={(v) => `${v} month${v === 1 ? "" : "s"}`}
-            leftHint="1 month"
-            rightHint="6 months"
+            format={(v) => `${v} week${v === 1 ? "" : "s"}`}
+            leftHint="1 week"
+            rightHint="26 weeks"
           />
         </div>
         <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-600">

@@ -62,7 +62,7 @@ create table if not exists public.campaigns (
   name              text not null default '',
   budget            integer not null check (budget between 250 and 5000),
   zip               text not null default '',
-  duration_months   integer not null default 1 check (duration_months between 1 and 6),
+  duration_weeks    integer not null default 4 check (duration_weeks between 1 and 26),
   continuous        boolean not null default false,
   manual_mode       boolean not null default false,
   platform_split    jsonb not null default '{"google":34,"meta":33,"reddit":33}'::jsonb,
@@ -127,3 +127,15 @@ alter table public.businesses add column if not exists linked_accounts_json json
 alter table public.campaigns add column if not exists google_ads_json jsonb;
 alter table public.campaigns add column if not exists google_campaign_id text;
 alter table public.campaigns add column if not exists google_status text;
+
+-- Aug 7 (later) — duration is now measured in WEEKS (like Google Ads).
+-- Adds the new column and converts existing campaigns (months × 4 ≈ weeks).
+-- The old duration_months column stays behind, ignored by the app.
+alter table public.campaigns add column if not exists duration_weeks integer;
+update public.campaigns
+  set duration_weeks = greatest(1, least(26, coalesce(duration_months, 1) * 4))
+  where duration_weeks is null;
+alter table public.campaigns alter column duration_weeks set not null;
+alter table public.campaigns alter column duration_weeks set default 4;
+alter table public.campaigns drop constraint if exists campaigns_duration_weeks_check;
+alter table public.campaigns add constraint campaigns_duration_weeks_check check (duration_weeks between 1 and 26);
