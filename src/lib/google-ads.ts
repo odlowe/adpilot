@@ -404,23 +404,46 @@ export function publishGaps(g: GoogleAdsCampaignPlan): string[] {
   return gaps;
 }
 
-/** Downloads an image (https or data: URL) as base64 for Google's ImageAsset. */
-async function imageAsBase64(url: string): Promise<string | null> {
+/**
+ * Downloads an image (https or data: URL) and normalizes it to EXACTLY the
+ * pixel size Google's asset spec demands — center-crop to the ratio, scale
+ * up or down as needed, recompress as JPEG. Google enforces aspect ratios
+ * to the percent (ASPECT_RATIO_NOT_ALLOWED taught us that), and our AI
+ * generator produces 16:9 while Google wants 1.91:1 — this bridges every
+ * such gap in one place, including images stored before this fix existed.
+ */
+async function imageAsBase64(url: string, width: number, height: number): Promise<string | null> {
   try {
+    let buf: Buffer;
     if (url.startsWith("data:")) {
       const comma = url.indexOf(",");
       if (comma === -1) return null;
-      return url.slice(comma + 1);
+      buf = Buffer.from(url.slice(comma + 1), "base64");
+    } else {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      buf = Buffer.from(await res.arrayBuffer());
     }
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > 5 * 1024 * 1024) return null; // Google's 5MB cap
-    return Buffer.from(buf).toString("base64");
+    if (buf.byteLength > 20 * 1024 * 1024) return null; // sanity cap pre-resize
+    // Dynamic import: sharp only loads when a publish actually runs.
+    const sharp = (await import("sharp")).default;
+    const out = await sharp(buf)
+      .resize(width, height, { fit: "cover", position: "centre" })
+      .jpeg({ quality: 88 })
+      .toBuffer();
+    if (out.byteLength > 5 * 1024 * 1024) return null; // Google's hard cap
+    return out.toString("base64");
   } catch {
     return null;
   }
 }
+
+/** Google's exact pixel specs per image slot. */
+const IMAGE_SPECS: Record<string, { width: number; height: number }> = {
+  MARKETING_IMAGE: { width: 1200, height: 628 }, // 1.91:1
+  SQUARE_MARKETING_IMAGE: { width: 1200, height: 1200 },
+  LOGO: { width: 1200, height: 1200 },
+};
 
 /** "youtube.com/watch?v=ID" or "youtu.be/ID" → ID (channel links: null). */
 function youtubeVideoId(url: string): string | null {
@@ -556,7 +579,8 @@ export async function publishCampaignToGoogle(
     label: string,
     target: "group" | "campaign" = "group"
   ): Promise<boolean> => {
-    const data = await imageAsBase64(url);
+    const spec = IMAGE_SPECS[fieldType] ?? IMAGE_SPECS.MARKETING_IMAGE;
+    const data = await imageAsBase64(url, spec.width, spec.height);
     if (!data) {
       warnings.push(`Couldn't load the ${label} image — skipped it.`);
       return false;
