@@ -427,6 +427,25 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
 - v4 (business-creation timeout fix) was never uploaded — v5 zip is
   cumulative; Owen uploads v5 only.
 
+### Aug 7 (round 12) — headline formula system (v14)
+- Owen saw MOCK output in Google's UI ("People within 5 miles who match...",
+  clipped sentences) — his live campaign was written by the BACKUP writer,
+  meaning the Claude call silently failed on that generation. Three fixes:
+  (1) plan.engine "claude"|"builtin" + amber "backup writer used" notice in
+  the preview (silent fallback is now visible); (2) ANTHROPIC_TIMEOUT_MS
+  25s→50s, generate + campaigns/[id] maxDuration 30→60; (3) backup writer's
+  longHeadlines rebuilt from templates (audienceSummary blurb BANNED from
+  long headlines/descriptions).
+- PLAN_SYSTEM_PROMPT now carries explicit FORMULAS: headline portfolio
+  (2 brand / 3 benefit / 2 problem / 2 local-trust / 2 action / 2 proof /
+  2 wildcards, varied first words + lengths), long-headline recipes (5
+  complete-sentence patterns, "write a shorter complete sentence" rule),
+  tiered search terms (urgent/service+place/comparison/outcome/brand), and
+  a HARD no-invented-facts rule (no fake discounts/years/awards/licensed).
+- POLITICAL: prompt rules + withPoliticalTerms() code guarantee — candidate
+  name always in keywords+themes, plus "name district N"/"name ward N"
+  parsed from the input. PlanOptions.category flows from both routes.
+
 ### Aug 7 (round 11) — 🎉 FIRST CAMPAIGN ON GOOGLE + account-tree diagnostic (v12)
 - **PUBLISH SUCCEEDED**: campaign 24110026254 ("Campaign Strike — Deal
   seekers nearby") created PAUSED in test client 6768358139. The entire
