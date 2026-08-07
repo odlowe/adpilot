@@ -427,6 +427,18 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
 - v4 (business-creation timeout fix) was never uploaded — v5 zip is
   cumulative; Owen uploads v5 only.
 
+### Aug 7 (round 6) — publish backfill + split upload doors (v6/v7)
+- Owen's first push attempt failed on "needs a square logo": the plan is a
+  LAUNCH-TIME SNAPSHOT and his logo was added after (or labeled "Other").
+  /api/google/publish now backfills squareLogoUrl + videoUrls from the
+  CURRENT business profile before the gap check, and persists the patched
+  googleAdsJson on success (v6).
+- BusinessModal (v7): single "Add" tile replaced by two side-by-side doors —
+  "Upload logo" (forced Logo label, amber until a Logo exists, then green
+  "Logo added ✓") and "Upload other images" (label Other, adjustable via
+  each thumbnail's dropdown as before). cropQueue entries now carry
+  {file, label}; filename-regex label guessing is gone.
+
 **NOT built yet**: status/metrics sync via searchStream GAQL (dashboard still
 shows fake numbers), pause/resume wiring to Google, per-customer production
 accounts + Basic-access application (Owen applies after test publishing
