@@ -346,10 +346,51 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
   so inserts without it are fine). Old landing-page localStorage drafts
   (durationMonths shape) just fall back to the 4-week default.
 
-**NOT built yet**: the actual Google API publish (createCampaignBudget →
-createPMaxCampaign → createAssetGroup → status sync — numbered plan at the
-bottom of google-ads.ts) and Owen's OAuth credential walkthrough (list below,
-unchanged). No campaign is sent to Google; googleAdsJson is the ready payload.
+### Aug 7 (round 3) — GOOGLE PUBLISH ENGINE + OAUTH CONNECT BUILT
+
+- **google-ads.ts**: buildConsentUrl / exchangeCodeForRefreshToken /
+  listAccessibleCustomers; publishGaps() (plain-English pre-flight);
+  publishCampaignToGoogle() — ONE atomic googleAds:mutate with temp resource
+  ids: budget → PMax campaign (created PAUSED, always) → proximity(zip+radius,
+  US)+English criteria → text/image/logo/CTA/YouTube assets → asset group +
+  assetGroupAssets → search-theme signals → campaign-level sitelinks. Images
+  fetched from https OR data: URLs → base64 (5MB cap); channel-URL YouTube
+  links skipped with warning (only real video URLs attach).
+  setGoogleCampaignStatus() ready for pause/resume wiring later.
+- **Routes**: /api/google/connect (login-required; state cookie; consent
+  redirect — redirect_uri derived via lib/request-origin.ts, proxy-aware),
+  /api/google/callback (exchanges code, SHOWS refresh token on a branded HTML
+  page with paste-into-Vercel steps — never stored), /api/google/status
+  (JSON checklist of all six env vars + live listAccessibleCustomers probe
+  with plain-English hints), /api/google/publish/[id] (POST, owner's
+  campaigns only, rate-limited 5/10m, REFUSES to run without
+  GOOGLE_ADS_TEST_CUSTOMER_ID — cannot touch real accounts; maxDuration 60;
+  stores googleCampaignId + googleStatus "PAUSED").
+- **UI**: ActiveCampaigns cards get "Push to Google (test)" (blue, only when
+  googleAdsJson && !googleCampaignId && !isSample) + an "On Google (test)"
+  badge; success/warning notices surface above the card list.
+- **Env vars for this feature** (developer token already set):
+  GOOGLE_ADS_OAUTH_CLIENT_ID, GOOGLE_ADS_OAUTH_CLIENT_SECRET,
+  GOOGLE_ADS_LOGIN_CUSTOMER_ID (test manager, digits only),
+  GOOGLE_ADS_TEST_CUSTOMER_ID (test client, digits only),
+  GOOGLE_ADS_REFRESH_TOKEN (minted via /api/google/connect AFTER the client
+  id/secret are set — must consent with the Google account that owns the
+  test manager). OAuth consent screen must be pushed to "In production"
+  (External) or the refresh token dies every 7 days. Redirect URIs to
+  register: https://campaignstrike.com/api/google/callback + the
+  .vercel.app equivalent. Owen was given click-by-click instructions.
+- Verified: tsc strict + full next build clean; consent-URL and
+  publishGaps logic smoke-tested. Real publish untested until Owen's
+  credentials exist — FIRST ACTION NEXT SESSION: /api/google/status, then
+  push a test campaign and fix whatever Google complains about (field-name
+  or enum mismatches in the mutate payload are the likely failure mode;
+  API version pinned v20 via GOOGLE_ADS_API_VERSION).
+
+**NOT built yet**: status/metrics sync via searchStream GAQL (dashboard still
+shows fake numbers), pause/resume wiring to Google, per-customer production
+accounts + Basic-access application (Owen applies after test publishing
+works). Validation demo kit (playbook/one-pager/scorecard/tracker) was
+delivered Aug 7 — Owen is booking ~20 demos in parallel.
 
 ## GOOGLE ADS BUILD — Owen's 9-page blueprint (Jul 10, reference)
 
