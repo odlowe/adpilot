@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { listCampaignsByUser, updateCampaign } from "@/lib/db";
+import { getBusinessById, listCampaignsByUser, updateCampaign } from "@/lib/db";
 import { isGoogleAdsConfigured, publishCampaignToGoogle, publishGaps } from "@/lib/google-ads";
 import { rateLimit } from "@/lib/ratelimit";
 
@@ -56,7 +56,19 @@ export async function POST(
     );
   }
 
-  const gaps = publishGaps(campaign.googleAdsJson);
+  // The Google plan is a snapshot from launch time — if the owner fixed
+  // their business profile since (added a logo, new brand images), pull the
+  // freshest versions in rather than forcing them to recreate the campaign.
+  let plan = campaign.googleAdsJson;
+  const business = await getBusinessById(campaign.businessId);
+  if (business && business.userId === user.id) {
+    const logo = business.brandingJson.find((b) => b.label === "Logo")?.url ?? null;
+    if (!plan.squareLogoUrl && logo) plan = { ...plan, squareLogoUrl: logo };
+    const youtube = business.linkedAccountsJson?.youtube?.trim();
+    if (plan.videoUrls.length === 0 && youtube) plan = { ...plan, videoUrls: [youtube] };
+  }
+
+  const gaps = publishGaps(plan);
   if (gaps.length > 0) {
     return NextResponse.json(
       { error: `Before this can go to Google it needs: ${gaps.join(", ")}.` },
@@ -70,9 +82,10 @@ export async function POST(
       campaign.name,
       campaign.zip,
       campaign.targetingJson.radiusMiles,
-      campaign.googleAdsJson
+      plan
     );
     const updated = await updateCampaign(campaign.id, user.id, {
+      googleAdsJson: plan,
       googleCampaignId: result.campaignId,
       googleStatus: "PAUSED",
     });

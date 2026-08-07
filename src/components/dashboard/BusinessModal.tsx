@@ -39,7 +39,8 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
   const [branding, setBranding] = useState<BrandingImage[]>(business?.brandingJson ?? []);
   const [linked, setLinked] = useState<LinkedAccounts>(business?.linkedAccountsJson ?? {});
   const [uploadingBrand, setUploadingBrand] = useState(false);
-  const brandInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const photosInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,19 +72,21 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
     }
   }
 
-  // Picked files wait in line for the square-crop step, one at a time.
-  const [cropQueue, setCropQueue] = useState<File[]>([]);
+  // Picked files wait in line for the square-crop step, one at a time —
+  // each remembers whether it came in through the Logo door or the Photos door.
+  const [cropQueue, setCropQueue] = useState<Array<{ file: File; label: BrandingImage["label"] }>>([]);
 
-  function queueBranding(files: FileList | null) {
+  function queueBranding(files: FileList | null, label: BrandingImage["label"]) {
     if (!files || files.length === 0) return;
     const room = Math.max(0, 8 - branding.length);
     const images = Array.from(files)
       .filter((f) => f.type.startsWith("image/"))
-      .slice(0, room);
+      .slice(0, room)
+      .map((file) => ({ file, label }));
     if (images.length > 0) setCropQueue((prev) => [...prev, ...images]);
   }
 
-  async function uploadCropped(dataUrl: string, sourceName: string) {
+  async function uploadCropped(dataUrl: string, label: BrandingImage["label"]) {
     setCropQueue((prev) => prev.slice(1));
     setUploadingBrand(true);
     setError(null);
@@ -94,7 +97,6 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
       const res = await fetch("/api/upload", { method: "POST", body: form });
       const data = (await res.json()) as { url?: string; error?: string };
       if (res.ok && data.url) {
-        const label: BrandingImage["label"] = /logo/i.test(sourceName) ? "Logo" : "Other";
         setBranding((prev) => [...prev, { url: data.url as string, label }]);
       } else {
         setError(data.error ?? "One of the uploads failed.");
@@ -105,6 +107,8 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
       setUploadingBrand(false);
     }
   }
+
+  const hasLogo = branding.some((b) => b.label === "Logo");
 
   async function handleDelete() {
     if (!business) return;
@@ -231,9 +235,40 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
         {/* ---- brand images ---- */}
         <label className={labelClass}>
           Brand images{" "}
-          <span className="font-normal text-slate-400">(logo, storefront, your work — the AI puts these in your ads)</span>
+          <span className="font-normal text-slate-400">(the AI puts these in your ads — Google needs the logo)</span>
         </label>
-        <div className="mt-1.5 flex flex-wrap items-start gap-2.5">
+
+        {/* two doors: logo in one, everything else in the other */}
+        <div className="mt-1.5 grid gap-2.5 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => logoInputRef.current?.click()}
+            disabled={uploadingBrand || branding.length >= 8}
+            className={`flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-4 transition disabled:opacity-50 ${
+              hasLogo
+                ? "border-emerald-300 bg-emerald-50/40 text-emerald-700"
+                : "border-amber-300 bg-amber-50/40 text-amber-700 hover:border-amber-500"
+            }`}
+          >
+            {uploadingBrand ? <Loader2 size={17} className="animate-spin" /> : <ImagePlus size={17} />}
+            <span className="text-xs font-bold">{hasLogo ? "Logo added ✓ — add another" : "Upload logo"}</span>
+            <span className="text-[10px] font-medium opacity-70">
+              {hasLogo ? "Square, ready for Google" : "Required for Google ads · cropped square"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => photosInputRef.current?.click()}
+            disabled={uploadingBrand || branding.length >= 8}
+            className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-slate-500 transition hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50"
+          >
+            {uploadingBrand ? <Loader2 size={17} className="animate-spin" /> : <ImagePlus size={17} />}
+            <span className="text-xs font-bold">Upload other images</span>
+            <span className="text-[10px] font-medium opacity-70">Storefront · product / work · team</span>
+          </button>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-start gap-2.5">
           {branding.map((img, i) => (
             <span key={`${img.url.slice(-16)}-${i}`} className="flex flex-col items-center gap-1">
               <span className="relative inline-block">
@@ -269,27 +304,26 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
             </span>
           ))}
           <input
-            ref={brandInputRef}
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              queueBranding(e.target.files, "Logo");
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={photosInputRef}
             type="file"
             accept="image/*"
             multiple
             className="hidden"
             onChange={(e) => {
-              queueBranding(e.target.files);
+              queueBranding(e.target.files, "Other");
               e.target.value = "";
             }}
           />
-          {branding.length < 8 && (
-            <button
-              type="button"
-              onClick={() => brandInputRef.current?.click()}
-              disabled={uploadingBrand}
-              className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 text-slate-400 transition hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50"
-            >
-              {uploadingBrand ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
-              <span className="text-[10px] font-semibold">Add</span>
-            </button>
-          )}
         </div>
 
         {/* ---- linked accounts (Google Ads wizard, page 2) ---- */}
@@ -369,11 +403,11 @@ export default function BusinessModal({ business, canDelete, onClose, onSaved }:
 
       {cropQueue.length > 0 && (
         <ImageCropModal
-          key={`${cropQueue[0].name}-${cropQueue.length}`}
-          file={cropQueue[0]}
+          key={`${cropQueue[0].file.name}-${cropQueue.length}`}
+          file={cropQueue[0].file}
           presets={BRAND_CROP}
-          title={/logo/i.test(cropQueue[0].name) ? "Crop your logo (square)" : "Crop to square"}
-          onDone={(dataUrl) => void uploadCropped(dataUrl, cropQueue[0].name)}
+          title={cropQueue[0].label === "Logo" ? "Crop your logo (square)" : "Crop to square"}
+          onDone={(dataUrl) => void uploadCropped(dataUrl, cropQueue[0].label)}
           onCancel={() => setCropQueue((prev) => prev.slice(1))}
         />
       )}
