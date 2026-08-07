@@ -725,6 +725,48 @@ export async function createClientAccountUnderManager(
   return id;
 }
 
+/** Runs a GAQL query against an account; returns raw result rows. */
+export async function googleAdsSearch(
+  customerId: string,
+  query: string
+): Promise<Array<Record<string, unknown>>> {
+  const reply = (await googleAdsRequest(customerId.replace(/-/g, ""), "/googleAds:search", {
+    query,
+    pageSize: 100,
+  })) as { results?: Array<Record<string, unknown>> };
+  return reply.results ?? [];
+}
+
+/** The full family tree under a manager — names, ids, status, test flag. */
+export async function listClientAccounts(managerCustomerId: string): Promise<
+  Array<{ id: string; name: string; status: string; isManager: boolean; isTest: boolean; level: string }>
+> {
+  const rows = await googleAdsSearch(
+    managerCustomerId,
+    `SELECT customer_client.id, customer_client.descriptive_name, customer_client.level,
+            customer_client.manager, customer_client.status, customer_client.test_account
+     FROM customer_client`
+  );
+  return rows.map((row) => {
+    const c = (row.customerClient ?? {}) as {
+      id?: string | number;
+      descriptiveName?: string;
+      level?: string | number;
+      manager?: boolean;
+      status?: string;
+      testAccount?: boolean;
+    };
+    return {
+      id: String(c.id ?? "?"),
+      name: c.descriptiveName ?? "(unnamed)",
+      status: c.status ?? "?",
+      isManager: Boolean(c.manager),
+      isTest: Boolean(c.testAccount),
+      level: String(c.level ?? "?"),
+    };
+  });
+}
+
 /** Flips a published campaign's status (ENABLED / PAUSED / REMOVED). */
 export async function setGoogleCampaignStatus(
   customerId: string,
