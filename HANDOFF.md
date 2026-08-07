@@ -427,6 +427,16 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
 - v4 (business-creation timeout fix) was never uploaded — v5 zip is
   cumulative; Owen uploads v5 only.
 
+### Aug 7 (round 7) — CUSTOMER_NOT_ENABLED fix (v8)
+- First real publish attempt reached Google → 403 CUSTOMER_NOT_ENABLED: the
+  UI-created test client (7347346250) is stuck in Draft (Owen couldn't
+  finish/skip the signup wizard). Fix: createClientAccountUnderManager()
+  (customers/{mgr}:createCustomerClient, USD, America/Chicago) + GET
+  /api/google/create-test-client (login + rate-limited 3/10m) — API-born
+  accounts arrive ENABLED. Owen visits it, swaps the returned id into
+  GOOGLE_ADS_TEST_CUSTOMER_ID, redeploys, re-pushes. The old draft account
+  can be ignored forever.
+
 ### Aug 7 (round 6) — publish backfill + split upload doors (v6/v7)
 - Owen's first push attempt failed on "needs a square logo": the plan is a
   LAUNCH-TIME SNAPSHOT and his logo was added after (or labeled "Other").
