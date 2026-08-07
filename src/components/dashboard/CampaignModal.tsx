@@ -1002,7 +1002,9 @@ export default function CampaignModal({
                 <div className="mt-6 rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 p-7 text-center">
                   <Loader2 size={24} className="mx-auto animate-spin text-emerald-600" />
                   <p className="mt-3 font-semibold text-navy-900">Writing your ads and mapping your audience…</p>
-                  <p className="mt-1 text-sm text-slate-500">Usually done in a few seconds.</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Usually 10–30 seconds — it&apos;s researching your customer, not just filling in blanks.
+                  </p>
                 </div>
               )}
 

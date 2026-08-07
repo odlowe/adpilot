@@ -69,8 +69,15 @@ export async function POST(request: Request) {
     await new Promise((resolve) => setTimeout(resolve, 1400));
   }
 
-  const plan = await generateCampaignPlan(intentText, budget, radiusMiles, opts);
-  return NextResponse.json({ plan });
+  try {
+    const plan = await generateCampaignPlan(intentText, budget, radiusMiles, opts);
+    return NextResponse.json({ plan });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "The AI writer is briefly unavailable — try again." },
+      { status: 502 }
+    );
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {

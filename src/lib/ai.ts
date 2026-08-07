@@ -287,9 +287,9 @@ function withDisclaimer(
 // ---------------------------------------------------------------------------
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
-// Generous on purpose: a slow reply that arrives beats a silent fallback to
-// the backup writer. Routes that call this run with maxDuration 60.
-const ANTHROPIC_TIMEOUT_MS = 50_000;
+// 25s per attempt × 2 attempts fits inside the routes' 60s ceiling.
+const ANTHROPIC_TIMEOUT_MS = 25_000;
+const PLAN_ATTEMPTS = 2;
 
 export function isAiConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -474,8 +474,10 @@ function coercePlan(raw: unknown, budget: number, radiusMiles: number): Campaign
 }
 
 /**
- * The public planner. Claude when configured; the built-in planner otherwise
- * — and as the safety net on any API hiccup, so launch day can't break.
+ * The public planner. Claude or NOTHING when a key is configured — the
+ * built-in writer only serves keyless dev environments. On failure this
+ * THROWS (after retrying) so callers show an honest "try again" instead of
+ * silently shipping backup-quality copy. Owen's rule, Aug 7.
  */
 export async function generateCampaignPlan(
   intentText: string,
@@ -486,46 +488,55 @@ export async function generateCampaignPlan(
   if (!isAiConfigured()) {
     return generateMockPlan(intentText, budget, radiusMiles, opts);
   }
-  try {
-    const contextLines = [
-      `Business & customers: ${intentText}`,
-      `Monthly budget: $${budget}`,
-      `Radius: ${radiusMiles} miles`,
-      ...(opts.businessName ? [`Business name: ${opts.businessName}`] : []),
-      ...(opts.category ? [`Business category: ${opts.category}`] : []),
-      ...(opts.goal ? [`Campaign goal: ${GOAL_DESCRIPTIONS[opts.goal]}`] : []),
-      ...(opts.paidForBy?.trim()
-        ? [
-            `This is a POLITICAL campaign. Required disclaimer that must appear: "Paid for by ${opts.paidForBy.trim()}". Apply the political search-term rules.`,
-          ]
-        : []),
-    ];
-    const plan = coercePlan(
-      parseJsonBlock(await askClaude(PLAN_SYSTEM_PROMPT, contextLines.join("\n"), 2800)),
-      budget,
-      radiusMiles
-    );
-    // The pmax asset group must always exist and always carry the disclaimer.
-    let pmax =
-      plan.pmax ??
-      buildPmaxFromBasics(
-        plan.adCopy,
-        plan.targeting,
-        opts.businessName?.trim() || pickBusinessName(intentText)
+
+  const contextLines = [
+    `Business & customers: ${intentText}`,
+    `Monthly budget: $${budget}`,
+    `Radius: ${radiusMiles} miles`,
+    ...(opts.businessName ? [`Business name: ${opts.businessName}`] : []),
+    ...(opts.category ? [`Business category: ${opts.category}`] : []),
+    ...(opts.goal ? [`Campaign goal: ${GOAL_DESCRIPTIONS[opts.goal]}`] : []),
+    ...(opts.paidForBy?.trim()
+      ? [
+          `This is a POLITICAL campaign. Required disclaimer that must appear: "Paid for by ${opts.paidForBy.trim()}". Apply the political search-term rules.`,
+        ]
+      : []),
+  ];
+
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= PLAN_ATTEMPTS; attempt++) {
+    try {
+      const plan = coercePlan(
+        parseJsonBlock(await askClaude(PLAN_SYSTEM_PROMPT, contextLines.join("\n"), 2800)),
+        budget,
+        radiusMiles
       );
-    if (opts.paidForBy?.trim()) pmax = ensurePaidForBy(pmax, opts.paidForBy.trim());
-    return withPoliticalTerms(
-      { ...plan, engine: "claude", adCopy: withDisclaimer(plan.adCopy, opts.paidForBy), pmax },
-      intentText,
-      opts
-    );
-  } catch (err) {
-    console.warn(
-      "[ai] Claude call failed — using built-in planner:",
-      err instanceof Error ? err.message : err
-    );
-    return generateMockPlan(intentText, budget, radiusMiles, opts);
+      // The pmax asset group must always exist and always carry the disclaimer.
+      let pmax =
+        plan.pmax ??
+        buildPmaxFromBasics(
+          plan.adCopy,
+          plan.targeting,
+          opts.businessName?.trim() || pickBusinessName(intentText)
+        );
+      if (opts.paidForBy?.trim()) pmax = ensurePaidForBy(pmax, opts.paidForBy.trim());
+      return withPoliticalTerms(
+        { ...plan, engine: "claude", adCopy: withDisclaimer(plan.adCopy, opts.paidForBy), pmax },
+        intentText,
+        opts
+      );
+    } catch (err) {
+      lastError = err;
+      console.warn(
+        `[ai] plan attempt ${attempt}/${PLAN_ATTEMPTS} failed:`,
+        err instanceof Error ? err.message : err
+      );
+    }
   }
+  console.error("[ai] all plan attempts failed", lastError);
+  throw new Error(
+    "Your agent hit a busy moment and couldn't finish writing — wait a few seconds and try again."
+  );
 }
 
 // ---------------------------------------------------------------------------

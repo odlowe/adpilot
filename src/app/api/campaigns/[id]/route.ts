@@ -152,12 +152,22 @@ export async function PATCH(
           if (profileBits) enriched = `${enriched}. About the business: ${profileBits}`;
         }
 
-        const plan = await generateCampaignPlan(enriched, effectiveBudget, effectiveRadius, {
-          businessName: owned?.name,
-          category: owned?.category,
-          goal: existing.googleAdsJson?.goal,
-          paidForBy: existing.googleAdsJson?.paidForBy ?? undefined,
-        });
+        let plan;
+        try {
+          plan = await generateCampaignPlan(enriched, effectiveBudget, effectiveRadius, {
+            businessName: owned?.name,
+            category: owned?.category,
+            goal: existing.googleAdsJson?.goal,
+            paidForBy: existing.googleAdsJson?.paidForBy ?? undefined,
+          });
+        } catch (err) {
+          // Better an honest failure than silently rewriting their campaign
+          // with backup-quality copy — nothing was changed.
+          return NextResponse.json(
+            { error: err instanceof Error ? err.message : "The AI writer is briefly unavailable — your changes were not saved. Try again." },
+            { status: 502 }
+          );
+        }
         patch.adCopyJson = plan.adCopy;
         patch.targetingJson = {
           ...plan.targeting,
