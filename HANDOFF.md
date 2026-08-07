@@ -427,6 +427,32 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
 - v4 (business-creation timeout fix) was never uploaded — v5 zip is
   cumulative; Owen uploads v5 only.
 
+### Aug 7 (round 9) — first POLICY_FINDING (v10)
+- Publish reached Google's POLICY review (deepest layer yet): one text
+  asset disapproved as PROHIBITED, evidence = a quotation-mark character.
+  Fix: policySafe() strips quote chars + collapses !!/??/.... chains;
+  wired into clipAsset (prevention at plan time) AND textAsset() in
+  publishCampaignToGoogle (cures plans stored before the fix, no relaunch
+  needed). Prompt now bans quotes/repeated punctuation in pmax fields.
+- LESSON for future publish errors: mutate_operations index in Google's
+  error locates the exact op; policy findings list the offending text in
+  policyFindingDetails.evidences.
+
+### Aug 7 (round 8) — v23 payload fixes from Google's real feedback (v9)
+- PLOT TWIST: manager 8502715176 was NOT a test account (the missing red
+  badge was the tell; DEVELOPER_TOKEN_NOT_APPROVED proved it). Owen created
+  a REAL test manager via ads.google.com/nav/selectaccount?sf=mt, then
+  /api/google/create-test-client minted ENABLED client 6768358139 — the
+  API's first successful write. LOGIN_CUSTOMER_ID + TEST_CUSTOMER_ID both
+  updated in Vercel. (First attempt hit CUSTOMER_NOT_FOUND — typo'd id.)
+- First campaign publish → two v23-era requirements, both fixed in
+  publishCampaignToGoogle: (1) campaign.containsEuPoliticalAdvertising is
+  REQUIRED now — set DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING always (US
+  local product; US politics ≠ EU political advertising). (2) Brand
+  Guidelines is default-on for new PMax: BUSINESS_NAME + LOGO must link as
+  CampaignAssets, not assetGroupAssets — links split into group vs campaign
+  targets accordingly.
+
 ### Aug 7 (round 7) — CUSTOMER_NOT_ENABLED fix (v8)
 - First real publish attempt reached Google → 403 CUSTOMER_NOT_ENABLED: the
   UI-created test client (7347346250) is stuck in Draft (Owen couldn't
