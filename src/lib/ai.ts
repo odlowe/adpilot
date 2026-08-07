@@ -322,6 +322,7 @@ Respond with ONLY a valid JSON object — no markdown fences, no commentary — 
 }
 
 The "pmax" block is the Google Performance Max asset group — respect every character limit exactly; assets over the limit get truncated and read badly.
+Google's ad policy REJECTS assets containing quotation marks, repeated punctuation (!!, ??, ...), or gimmicky symbols — never use them in any pmax field.
 The quality bar: a keyword or theme is only good if you can point at the sentence in audienceProfile that produced it. Never pad lists with generic terms to hit a count.
 Ground everything in the actual business described. If a business name appears, weave it into headlines naturally.
 If the request mentions a required "Paid for by ..." political disclaimer, one pmax description and one adCopy description must end with that exact line.`;

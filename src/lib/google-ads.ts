@@ -50,9 +50,24 @@ export function isGoogleAdsConfigured(): boolean {
 // code here (shared by the AI planner, the API routes, and the preview editor).
 // ---------------------------------------------------------------------------
 
+/**
+ * Strips characters Google's ad policy flags as PROHIBITED in text assets —
+ * learned the hard way: a single stray quotation mark disapproves the
+ * whole asset. Quotes out, punctuation chains collapsed, spacing tidied.
+ */
+export function policySafe(value: string): string {
+  return value
+    .replace(/["“”„‟«»`]/g, "")
+    .replace(/!{2,}/g, "!")
+    .replace(/\?{2,}/g, "?")
+    .replace(/\.{4,}/g, "…")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Clip to a char budget at a word boundary, dropping trailing punctuation. */
 export function clipAsset(value: string, max: number): string {
-  const s = value.trim().replace(/\s+/g, " ");
+  const s = policySafe(value.trim().replace(/\s+/g, " "));
   if (s.length <= max) return s;
   const cut = s.slice(0, max + 1);
   const lastSpace = cut.lastIndexOf(" ");
@@ -522,8 +537,12 @@ export async function publishCampaignToGoogle(
   const campaignLinks: Array<{ asset: string; fieldType: string }> = [];
 
   const textAsset = (text: string, fieldType: string, target: "group" | "campaign" = "group") => {
+    // Scrub at the door too — plans stored before this fix still carry
+    // policy-hostile characters, and republishing must cure them.
+    const clean = policySafe(text);
+    if (!clean) return;
     const res = assetRes();
-    ops.push({ assetOperation: { create: { resourceName: res, textAsset: { text } } } });
+    ops.push({ assetOperation: { create: { resourceName: res, textAsset: { text: clean } } } });
     (target === "campaign" ? campaignLinks : links).push({ asset: res, fieldType });
   };
   g.headlines.forEach((h) => textAsset(h, "HEADLINE"));
