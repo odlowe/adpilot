@@ -60,6 +60,36 @@ export default function ActiveCampaigns({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pushingId, setPushingId] = useState<string | null>(null);
+  const [pushNotice, setPushNotice] = useState<string | null>(null);
+
+  /** Test-drive button: sends the stored Google plan to the TEST ad account. */
+  async function pushToGoogle(campaign: Campaign) {
+    setPushingId(campaign.id);
+    setError(null);
+    setPushNotice(null);
+    try {
+      const res = await fetch(`/api/google/publish/${campaign.id}`, { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        googleCampaignId?: string;
+        warnings?: string[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(data.error ?? (await readError(res)));
+        return;
+      }
+      setPushNotice(
+        `“${campaign.name}” is now on Google's test account (campaign ${data.googleCampaignId}, paused — it can't spend there).` +
+          (data.warnings?.length ? ` Notes: ${data.warnings.join(" ")}` : "")
+      );
+      router.refresh();
+    } catch {
+      setError("No connection — check your internet and try again.");
+    } finally {
+      setPushingId(null);
+    }
+  }
 
   // inline rename state — the pencil only changes the name, nothing else
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -147,6 +177,11 @@ export default function ActiveCampaigns({
       {error && (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
           {error}
+        </p>
+      )}
+      {pushNotice && (
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+          {pushNotice}
         </p>
       )}
       {active.length === 0 ? (
@@ -351,6 +386,31 @@ export default function ActiveCampaigns({
                       <Square size={13} />
                       End campaign
                     </button>
+                    {campaign.googleAdsJson && !campaign.googleCampaignId && !campaign.isSample && (
+                      <button
+                        type="button"
+                        disabled={pushingId === campaign.id}
+                        onClick={() => void pushToGoogle(campaign)}
+                        title="Creates this campaign (paused) in the Google Ads TEST account — no money can move there."
+                        className="flex items-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-800 transition hover:border-blue-500 hover:bg-blue-100 disabled:opacity-60"
+                      >
+                        {pushingId === campaign.id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Rocket size={13} />
+                        )}
+                        Push to Google (test)
+                      </button>
+                    )}
+                    {campaign.googleCampaignId && (
+                      <span
+                        title={`Google campaign ${campaign.googleCampaignId}`}
+                        className="flex items-center gap-1.5 rounded-xl bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-800 ring-1 ring-blue-200"
+                      >
+                        <Check size={13} />
+                        On Google (test)
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
