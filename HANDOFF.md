@@ -427,6 +427,18 @@ The 9-page blueprint below is now IMPLEMENTED product-side. What exists:
 - v4 (business-creation timeout fix) was never uploaded — v5 zip is
   cumulative; Owen uploads v5 only.
 
+### Aug 7 (round 10) — ASPECT_RATIO_NOT_ALLOWED → sharp normalizer (v11)
+- Google enforces image ratios exactly: MARKETING_IMAGE must be 1.91:1 but
+  Gemini generates 16:9 (and banner is 21:9). Fix: **first real dependency
+  added — sharp** (breaks the "raw fetch only" convention deliberately;
+  pixel work is impossible dependency-free, and sharp is Vercel-native).
+  imageAsBase64(url,w,h) now center-crops + scales EVERY image to Google's
+  exact spec at publish time (IMAGE_SPECS: 1200×628 / 1200×1200 / 1200×1200
+  logo), jpeg q88, dynamic import so sharp loads only during publish.
+  Handles data: URLs and https, legacy stored images included.
+- REMINDER: package.json + package-lock.json changed — Owen MUST upload
+  both or Vercel's build won't install sharp.
+
 ### Aug 7 (round 9) — first POLICY_FINDING (v10)
 - Publish reached Google's POLICY review (deepest layer yet): one text
   asset disapproved as PROHIBITED, evidence = a quotation-mark character.
